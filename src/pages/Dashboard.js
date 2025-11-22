@@ -1,8 +1,11 @@
 import { useState, useEffect, memo } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { motion, AnimatePresence } from 'framer-motion';
 import { FiBarChart2, FiTrendingUp, FiCheckCircle, FiRefreshCw, FiArrowLeft, FiCalendar, FiMapPin, FiX } from 'react-icons/fi';
 import { THEME } from '@lib/themeColors';
 import SwitzerlandMap from '@components/SwitzerlandMap';
+import AnimatedCard from '@components/ui/AnimatedCard';
+import AnimatedButton from '@components/ui/AnimatedButton';
 
 // Swiss cantons list
 const SWISS_CANTONS = [
@@ -131,20 +134,18 @@ const Dashboard = memo(() => {
     setSelectedCantons([]);
   };
 
-  const StatCard = ({ icon: Icon, label, value, color = THEME.accent }) => (
-    <div 
-      className="p-6 border-2 transition-all"
+  const StatCard = ({ icon: Icon, label, value, color = THEME.accent, delay = 0 }) => (
+    <AnimatedCard
+      delay={delay}
+      className="p-4 sm:p-6 border-2"
       style={{ 
         backgroundColor: THEME.card, 
         borderColor: THEME.border,
       }}
-      onMouseEnter={(e) => {
-        e.currentTarget.style.borderColor = color;
-        e.currentTarget.style.backgroundColor = THEME.surfaceHover;
-      }}
-      onMouseLeave={(e) => {
-        e.currentTarget.style.borderColor = THEME.border;
-        e.currentTarget.style.backgroundColor = THEME.card;
+      whileHover={{ 
+        borderColor: color,
+        backgroundColor: THEME.surfaceHover,
+        scale: 1.02
       }}
     >
       <div className="flex items-center justify-between mb-4">
@@ -166,26 +167,38 @@ const Dashboard = memo(() => {
           {isLoading ? '...' : value.toLocaleString()}
         </div>
       </div>
-    </div>
+    </AnimatedCard>
   );
 
   return (
-    <div className="min-h-screen" style={{ backgroundColor: THEME.background }}>
+    <motion.div 
+      className="min-h-screen" 
+      style={{ backgroundColor: THEME.background }}
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ duration: 0.3 }}
+    >
       {/* Header Section */}
-      <section className="text-white py-6" style={{ backgroundColor: THEME.accent }}>
+      <motion.section 
+        className="text-white py-4 sm:py-6" 
+        style={{ backgroundColor: THEME.accent }}
+        initial={{ y: -20, opacity: 0 }}
+        animate={{ y: 0, opacity: 1 }}
+        transition={{ duration: 0.4 }}
+      >
         <div className="max-w-6xl mx-auto px-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <button
+              <motion.button
                 onClick={() => navigate('/')}
-                className="flex items-center gap-2 px-3 py-2 text-white transition-colors font-bold text-xs uppercase"
+                className="flex items-center gap-2 px-3 py-2 text-white font-bold text-xs uppercase min-h-[44px]"
                 style={{ backgroundColor: 'rgba(255,255,255,0.2)' }}
-                onMouseEnter={(e) => e.target.style.backgroundColor = 'rgba(255,255,255,0.3)'}
-                onMouseLeave={(e) => e.target.style.backgroundColor = 'rgba(255,255,255,0.2)'}
+                whileHover={{ backgroundColor: 'rgba(255,255,255,0.3)' }}
+                whileTap={{ scale: 0.95 }}
               >
                 <FiArrowLeft size={16} />
                 Back
-              </button>
+              </motion.button>
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 bg-white/20 flex items-center justify-center">
                   <FiBarChart2 size={20} className="text-white" />
@@ -196,25 +209,24 @@ const Dashboard = memo(() => {
                 </div>
               </div>
             </div>
-            <button
+            <AnimatedButton
               onClick={handleRefresh}
               disabled={isLoading}
-              className="flex items-center gap-2 px-3 py-2 text-white transition-colors font-bold text-xs uppercase disabled:opacity-50"
-              style={{ backgroundColor: 'rgba(255,255,255,0.2)' }}
-              onMouseEnter={(e) => !isLoading && (e.target.style.backgroundColor = 'rgba(255,255,255,0.3)')}
-              onMouseLeave={(e) => !isLoading && (e.target.style.backgroundColor = 'rgba(255,255,255,0.2)')}
+              loading={isLoading}
+              variant="secondary"
+              className="px-3 py-2 text-xs uppercase min-h-[44px]"
+              icon={FiRefreshCw}
             >
-              <FiRefreshCw size={16} className={isLoading ? 'animate-spin' : ''} />
               Refresh
-            </button>
+            </AnimatedButton>
           </div>
         </div>
-      </section>
+      </motion.section>
 
       {/* Dashboard Content */}
-      <section className="max-w-6xl mx-auto px-4 py-6">
+      <section className="max-w-6xl mx-auto px-4 sm:px-6 py-4 sm:py-6">
         {/* Date Info */}
-        <div className="mb-6 p-4 flex items-center gap-3" style={{ backgroundColor: THEME.card, border: `2px solid ${THEME.border}` }}>
+        <AnimatedCard className="mb-4 sm:mb-6 p-4 sm:p-6 flex items-center gap-3" style={{ backgroundColor: THEME.card, border: `2px solid ${THEME.border}` }}>
           <FiCalendar size={20} style={{ color: THEME.accent }} />
           <div>
             <div className="text-sm font-bold" style={{ color: THEME.textMuted }}>Today</div>
@@ -227,32 +239,35 @@ const Dashboard = memo(() => {
               })}
             </div>
           </div>
-        </div>
+        </AnimatedCard>
 
         {/* Statistics Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6 mb-4 sm:mb-6">
           <StatCard
             icon={FiTrendingUp}
             label="Tickets Issued Today"
             value={stats.issuedToday}
             color={THEME.accent}
+            delay={0.1}
           />
           <StatCard
             icon={FiCheckCircle}
             label="Tickets Activated"
             value={stats.activated}
             color={THEME.success}
+            delay={0.2}
           />
           <StatCard
             icon={FiBarChart2}
             label="Tickets Verified"
             value={stats.verified}
             color={THEME.accent}
+            delay={0.3}
           />
         </div>
 
         {/* Canton Selector Section */}
-        <div className="mb-6 p-4" style={{ backgroundColor: THEME.card, border: `2px solid ${THEME.border}` }}>
+        <AnimatedCard className="mb-4 sm:mb-6 p-4 sm:p-6" style={{ backgroundColor: THEME.card, border: `2px solid ${THEME.border}` }}>
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-3">
               <FiMapPin size={20} style={{ color: THEME.accent }} />
@@ -263,23 +278,20 @@ const Dashboard = memo(() => {
           </div>
 
           {/* Interactive Map - Dropdown */}
-          <div className="mb-6">
-            <button
+          <div className="mb-4 sm:mb-6">
+            <motion.button
               onClick={() => setShowMap(!showMap)}
-              className="w-full px-4 py-3 text-left border-2 transition-colors flex items-center justify-between"
+              className="w-full px-4 py-3 sm:py-4 text-left border-2 flex items-center justify-between min-h-[48px] text-base"
               style={{ 
                 borderColor: THEME.border,
                 backgroundColor: THEME.surface,
                 color: THEME.text
               }}
-              onMouseEnter={(e) => {
-                e.target.style.borderColor = THEME.accent;
-                e.target.style.backgroundColor = THEME.surfaceHover;
+              whileHover={{ 
+                borderColor: THEME.accent,
+                backgroundColor: THEME.surfaceHover
               }}
-              onMouseLeave={(e) => {
-                e.target.style.borderColor = THEME.border;
-                e.target.style.backgroundColor = THEME.surface;
-              }}
+              whileTap={{ scale: 0.98 }}
             >
               <div className="flex items-center gap-2">
                 <FiMapPin size={18} style={{ color: THEME.accent }} />
@@ -290,16 +302,24 @@ const Dashboard = memo(() => {
               <span className="text-xs" style={{ color: THEME.textMuted }}>
                 {showMap ? '▲' : '▼'}
               </span>
-            </button>
+            </motion.button>
 
-            {showMap && (
-              <div className="mt-4">
-                <SwitzerlandMap
-                  selectedCantons={selectedCantons}
-                  onCantonClick={toggleCanton}
-                />
-              </div>
-            )}
+            <AnimatePresence>
+              {showMap && (
+                <motion.div
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: 'auto' }}
+                  exit={{ opacity: 0, height: 0 }}
+                  transition={{ duration: 0.3 }}
+                  className="mt-4 overflow-hidden"
+                >
+                  <SwitzerlandMap
+                    selectedCantons={selectedCantons}
+                    onCantonClick={toggleCanton}
+                  />
+                </motion.div>
+              )}
+            </AnimatePresence>
           </div>
 
           <div className="flex items-center justify-between mb-4">
@@ -309,99 +329,106 @@ const Dashboard = memo(() => {
               </h3>
             </div>
             <div className="flex gap-2">
-              {selectedCantons.length > 0 && (
-                <button
-                  onClick={clearAllCantons}
-                  className="px-3 py-1.5 text-xs font-bold uppercase transition-colors"
-                  style={{ 
-                    color: THEME.textMuted,
-                    border: `1px solid ${THEME.border}`,
-                    backgroundColor: 'transparent'
-                  }}
-                  onMouseEnter={(e) => {
-                    e.target.style.borderColor = THEME.accent;
-                    e.target.style.color = THEME.accent;
-                  }}
-                  onMouseLeave={(e) => {
-                    e.target.style.borderColor = THEME.border;
-                    e.target.style.color = THEME.textMuted;
-                  }}
-                >
-                  Clear All
-                </button>
-              )}
-              <button
+              <AnimatePresence>
+                {selectedCantons.length > 0 && (
+                  <motion.button
+                    initial={{ opacity: 0, scale: 0.8 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.8 }}
+                    onClick={clearAllCantons}
+                    className="px-3 py-2 text-xs font-bold uppercase min-h-[44px]"
+                    style={{ 
+                      color: THEME.textMuted,
+                      border: `1px solid ${THEME.border}`,
+                      backgroundColor: 'transparent'
+                    }}
+                    whileHover={{ 
+                      borderColor: THEME.accent,
+                      color: THEME.accent
+                    }}
+                    whileTap={{ scale: 0.95 }}
+                  >
+                    Clear All
+                  </motion.button>
+                )}
+              </AnimatePresence>
+              <motion.button
                 onClick={selectAllCantons}
-                className="px-3 py-1.5 text-xs font-bold uppercase transition-colors"
+                className="px-3 py-2 text-xs font-bold uppercase min-h-[44px]"
                 style={{ 
-                    color: THEME.textMuted,
-                    border: `1px solid ${THEME.border}`,
-                    backgroundColor: 'transparent'
-                  }}
-                  onMouseEnter={(e) => {
-                    e.target.style.borderColor = THEME.accent;
-                    e.target.style.color = THEME.accent;
-                  }}
-                  onMouseLeave={(e) => {
-                    e.target.style.borderColor = THEME.border;
-                    e.target.style.color = THEME.textMuted;
-                  }}
+                  color: THEME.textMuted,
+                  border: `1px solid ${THEME.border}`,
+                  backgroundColor: 'transparent'
+                }}
+                whileHover={{ 
+                  borderColor: THEME.accent,
+                  color: THEME.accent
+                }}
+                whileTap={{ scale: 0.95 }}
               >
                 Select All
-              </button>
+              </motion.button>
             </div>
           </div>
 
           {/* Selected Cantons Tags */}
-          {selectedCantons.length > 0 && (
-            <div className="mb-4 flex flex-wrap gap-2">
-              {selectedCantons.map(cantonCode => {
-                const canton = SWISS_CANTONS.find(c => c.code === cantonCode);
-                return (
-                  <div
-                    key={cantonCode}
-                    className="flex items-center gap-2 px-3 py-1.5"
-                    style={{ 
-                      backgroundColor: `${THEME.accent}20`,
-                      border: `1px solid ${THEME.accent}`
-                    }}
-                  >
-                    <span className="text-xs font-bold" style={{ color: THEME.text }}>
-                      {canton?.code || cantonCode}
-                    </span>
-                    <button
-                      onClick={() => removeCanton(cantonCode)}
-                      className="flex items-center justify-center"
-                      style={{ color: THEME.accent }}
-                      onMouseEnter={(e) => e.target.style.opacity = '0.7'}
-                      onMouseLeave={(e) => e.target.style.opacity = '1'}
+          <AnimatePresence>
+            {selectedCantons.length > 0 && (
+              <motion.div
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: 'auto' }}
+                exit={{ opacity: 0, height: 0 }}
+                className="mb-4 flex flex-wrap gap-2"
+              >
+                {selectedCantons.map((cantonCode, index) => {
+                  const canton = SWISS_CANTONS.find(c => c.code === cantonCode);
+                  return (
+                    <motion.div
+                      key={cantonCode}
+                      initial={{ opacity: 0, scale: 0.8 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      exit={{ opacity: 0, scale: 0.8 }}
+                      transition={{ delay: index * 0.05 }}
+                      className="flex items-center gap-2 px-3 py-2 min-h-[44px]"
+                      style={{ 
+                        backgroundColor: `${THEME.accent}20`,
+                        border: `1px solid ${THEME.accent}`
+                      }}
                     >
-                      <FiX size={14} />
-                    </button>
-                  </div>
-                );
-              })}
-            </div>
-          )}
+                      <span className="text-xs font-bold" style={{ color: THEME.text }}>
+                        {canton?.code || cantonCode}
+                      </span>
+                      <motion.button
+                        onClick={() => removeCanton(cantonCode)}
+                        className="flex items-center justify-center min-w-[24px] min-h-[24px]"
+                        style={{ color: THEME.accent }}
+                        whileHover={{ opacity: 0.7, scale: 1.1 }}
+                        whileTap={{ scale: 0.9 }}
+                      >
+                        <FiX size={14} />
+                      </motion.button>
+                    </motion.div>
+                  );
+                })}
+              </motion.div>
+            )}
+          </AnimatePresence>
 
           {/* Canton Selector */}
           <div className="relative">
-            <button
+            <motion.button
               onClick={() => setShowCantonSelector(!showCantonSelector)}
-              className="w-full px-4 py-3 text-left border-2 transition-colors flex items-center justify-between"
+              className="w-full px-4 py-3 sm:py-4 text-left border-2 flex items-center justify-between min-h-[48px] text-base"
               style={{ 
                 borderColor: THEME.border,
                 backgroundColor: THEME.surface,
                 color: THEME.text
               }}
-              onMouseEnter={(e) => {
-                e.target.style.borderColor = THEME.accent;
-                e.target.style.backgroundColor = THEME.surfaceHover;
+              whileHover={{ 
+                borderColor: THEME.accent,
+                backgroundColor: THEME.surfaceHover
               }}
-              onMouseLeave={(e) => {
-                e.target.style.borderColor = THEME.border;
-                e.target.style.backgroundColor = THEME.surface;
-              }}
+              whileTap={{ scale: 0.98 }}
             >
               <span className="text-sm font-bold">
                 {selectedCantons.length === 0 
@@ -411,76 +438,86 @@ const Dashboard = memo(() => {
               <span className="text-xs" style={{ color: THEME.textMuted }}>
                 {showCantonSelector ? '▲' : '▼'}
               </span>
-            </button>
+            </motion.button>
 
-            {showCantonSelector && (
-              <div 
-                className="absolute z-10 w-full mt-1 border-2 max-h-64 overflow-y-auto"
-                style={{ 
-                  borderColor: THEME.border,
-                  backgroundColor: THEME.card
-                }}
-              >
-                {SWISS_CANTONS.map(canton => {
-                  const isSelected = selectedCantons.includes(canton.code);
-                  return (
-                    <button
-                      key={canton.code}
-                      type="button"
-                      onClick={() => toggleCanton(canton.code)}
-                      className="w-full text-left px-4 py-2 flex items-center justify-between transition-colors"
-                      style={{ 
-                        color: THEME.text,
-                        backgroundColor: isSelected ? `${THEME.accent}20` : THEME.card
-                      }}
-                      onMouseEnter={(e) => {
-                        if (!isSelected) {
-                          e.target.style.backgroundColor = THEME.surfaceHover;
-                        }
-                      }}
-                      onMouseLeave={(e) => {
-                        if (!isSelected) {
-                          e.target.style.backgroundColor = THEME.card;
-                        }
-                      }}
-                    >
+            <AnimatePresence>
+              {showCantonSelector && (
+                <motion.div
+                  initial={{ opacity: 0, y: -10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -10 }}
+                  className="absolute z-10 w-full mt-1 border-2 max-h-64 overflow-y-auto"
+                  style={{ 
+                    borderColor: THEME.border,
+                    backgroundColor: THEME.card
+                  }}
+                >
+                  {SWISS_CANTONS.map((canton, index) => {
+                    const isSelected = selectedCantons.includes(canton.code);
+                    return (
+                      <motion.button
+                        key={canton.code}
+                        type="button"
+                        onClick={() => toggleCanton(canton.code)}
+                        initial={{ opacity: 0, x: -10 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        transition={{ delay: index * 0.02 }}
+                        className="w-full text-left px-4 py-3 flex items-center justify-between min-h-[48px] text-base"
+                        style={{ 
+                          color: THEME.text,
+                          backgroundColor: isSelected ? `${THEME.accent}20` : THEME.card
+                        }}
+                        whileHover={!isSelected ? { 
+                          backgroundColor: THEME.surfaceHover
+                        } : {}}
+                        whileTap={{ scale: 0.98 }}
+                      >
                       <div>
                         <span className="text-sm font-bold">{canton.name}</span>
                         <span className="text-xs ml-2" style={{ color: THEME.textMuted }}>
                           ({canton.code})
                         </span>
                       </div>
-                      {isSelected && (
+                        {isSelected && (
                         <FiCheckCircle size={16} style={{ color: THEME.accent }} />
                       )}
-                    </button>
-                  );
-                })}
-              </div>
-            )}
+                      </motion.button>
+                    );
+                  })}
+                </motion.div>
+              )}
+            </AnimatePresence>
           </div>
-        </div>
+        </AnimatedCard>
 
         {/* Canton Statistics */}
-        {selectedCantons.length > 0 && (
-          <div className="mb-6">
-            <h3 className="text-lg font-bold mb-4" style={{ color: THEME.text }}>
-              Statistics by Selected Canton{selectedCantons.length > 1 ? 's' : ''}
-            </h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {selectedCantons.map(cantonCode => {
-                const canton = SWISS_CANTONS.find(c => c.code === cantonCode);
-                const stats = cantonStats[cantonCode] || { issuedToday: 0, activated: 0, verified: 0 };
-                
-                return (
-                  <div
-                    key={cantonCode}
-                    className="p-4 border-2"
-                    style={{ 
-                      backgroundColor: THEME.card,
-                      borderColor: THEME.border
-                    }}
-                  >
+        <AnimatePresence>
+          {selectedCantons.length > 0 && (
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+              className="mb-4 sm:mb-6"
+            >
+              <h3 className="text-lg font-bold mb-4" style={{ color: THEME.text }}>
+                Statistics by Selected Canton{selectedCantons.length > 1 ? 's' : ''}
+              </h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
+                {selectedCantons.map((cantonCode, index) => {
+                  const canton = SWISS_CANTONS.find(c => c.code === cantonCode);
+                  const stats = cantonStats[cantonCode] || { issuedToday: 0, activated: 0, verified: 0 };
+                  
+                  return (
+                    <AnimatedCard
+                      key={cantonCode}
+                      delay={index * 0.1}
+                      className="p-4 sm:p-6 border-2"
+                      style={{ 
+                        backgroundColor: THEME.card,
+                        borderColor: THEME.border
+                      }}
+                      whileHover={{ scale: 1.02 }}
+                    >
                     <div className="flex items-center justify-between mb-3">
                       <h4 className="text-base font-bold" style={{ color: THEME.text }}>
                         {canton?.name || cantonCode}
@@ -513,15 +550,16 @@ const Dashboard = memo(() => {
                         </span>
                       </div>
                     </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        )}
+                    </AnimatedCard>
+                  );
+                })}
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
         {/* Info Box */}
-        <div className="p-4" style={{ backgroundColor: THEME.card, border: `2px solid ${THEME.border}` }}>
+        <AnimatedCard className="p-4 sm:p-6" style={{ backgroundColor: THEME.card, border: `2px solid ${THEME.border}` }}>
           <div className="flex items-start gap-3">
             <div className="w-8 h-8 flex items-center justify-center flex-shrink-0" style={{ backgroundColor: `${THEME.accent}20` }}>
               <FiBarChart2 size={18} style={{ color: THEME.accent }} />
@@ -537,9 +575,9 @@ const Dashboard = memo(() => {
               </p>
             </div>
           </div>
-        </div>
+        </AnimatedCard>
       </section>
-    </div>
+    </motion.div>
   );
 });
 
