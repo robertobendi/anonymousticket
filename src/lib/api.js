@@ -164,3 +164,69 @@ export function getPopularStations() {
   ];
 }
 
+/**
+ * Symmetric Key API service
+ * Fetches rotating symmetric keys from the backend server
+ */
+
+const KEY_API_BASE_URL = '/api';
+
+/**
+ * Get symmetric key (current or previous)
+ * @param {string} version - 'current' (default) or 'previous'
+ * @returns {Promise<Object>} Key data with key, createdAt, expiresAt, version
+ */
+export async function getSymmetricKey(version = 'current') {
+  try {
+    const params = new URLSearchParams({ version });
+    const response = await fetch(`${KEY_API_BASE_URL}/key?${params.toString()}`);
+    
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
+    }
+    
+    const data = await response.json();
+    return data;
+  } catch (error) {
+    console.error('Error fetching symmetric key:', error);
+    throw error;
+  }
+}
+
+/**
+ * Get current symmetric key
+ * @returns {Promise<Object>} Current key data
+ */
+export async function getCurrentKey() {
+  return getSymmetricKey('current');
+}
+
+/**
+ * Get previous symmetric key
+ * @returns {Promise<Object>} Previous key data
+ */
+export async function getPreviousKey() {
+  return getSymmetricKey('previous');
+}
+
+/**
+ * Get key rotation status
+ * @returns {Promise<Object>} Status information about key rotation
+ */
+export async function getKeyStatus() {
+  try {
+    const response = await fetch(`${KEY_API_BASE_URL}/key/status`);
+    
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    
+    const data = await response.json();
+    return data;
+  } catch (error) {
+    console.error('Error fetching key status:', error);
+    throw error;
+  }
+}
+

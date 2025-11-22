@@ -32,6 +32,12 @@ export default defineConfig({
   server: {
     port: 3000, // Match CRA's default port
     open: true,
+    proxy: {
+      '/api': {
+        target: 'http://localhost:3001',
+        changeOrigin: true,
+      },
+    },
   },
   resolve: {
     alias: {
