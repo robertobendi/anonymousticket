@@ -8,13 +8,15 @@ const Home = lazy(() => import("@pages/Home"));
 const Verify = lazy(() => import("@pages/Verify"));
 const Wallet = lazy(() => import("@pages/Wallet"));
 const ReceivedTickets = lazy(() => import("@pages/ReceivedTickets"));
+const Dashboard = lazy(() => import("@pages/Dashboard"));
 
 // Routes configuration
 const routes = [
   { path: "/", element: <Home /> },
   { path: "/verify", element: <Verify /> },
   { path: "/wallet", element: <Wallet /> },
-  { path: "/received", element: <ReceivedTickets /> }
+  { path: "/received", element: <ReceivedTickets /> },
+  { path: "/dashboard", element: <Dashboard /> }
 ];
 
 // Loading component
