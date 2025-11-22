@@ -80,29 +80,10 @@ const Dashboard = memo(() => {
     fetchStats();
   }, []);
 
-  // Fetch chain data function - uses CORS proxy to bypass browser restrictions
+  // Fetch chain data function - ZERO SECURITY
   const fetchChainData = useCallback(async (retries = 3) => {
-    // Use CORS proxy to bypass browser CORS restrictions
-    // Direct URL doesn't work due to CORS, so we use a proxy
-    const targetUrl = 'http://83.229.83.184:8000/chain';
-    
-    // Try multiple proxy options
-    let apiUrl;
-    if (Capacitor.isNativePlatform()) {
-      // On native, use direct URL (no CORS restrictions)
-      apiUrl = targetUrl;
-    } else {
-      // On web, use CORS proxy
-      // Option 1: Use our own server proxy if available
-      const isDev = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-      if (isDev) {
-        apiUrl = '/api/chain'; // Vite proxy in dev
-      } else {
-        // In production, use CORS proxy service
-        // Using a public CORS proxy (no security needed as requested)
-        apiUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(targetUrl)}`;
-      }
-    }
+    // Use proxy endpoint (Apache rewrites to blockchain API)
+    const apiUrl = '/api/chain';
     
     for (let attempt = 1; attempt <= retries; attempt++) {
       try {
@@ -111,71 +92,37 @@ const Dashboard = memo(() => {
         
         let data;
         
-        // Use fetch for HTTPS proxies, XMLHttpRequest for direct HTTP
-        if (apiUrl.startsWith('https://') || apiUrl.startsWith('http://') && !Capacitor.isNativePlatform()) {
-          // Use fetch for web (works with CORS proxies)
-          const response = await fetch(apiUrl, {
-            method: 'GET',
-            headers: {
-              'Accept': 'application/json',
-            },
-          });
+        // Raw dogging - XMLHttpRequest direct, no checks, no nothing
+        data = await new Promise((resolve, reject) => {
+          const xhr = new XMLHttpRequest();
           
-          if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
-          }
+          xhr.open('GET', apiUrl, true);
+          xhr.setRequestHeader('Accept', 'application/json');
           
-          const responseText = await response.text();
-          
-          // Check if we got HTML instead of JSON
-          if (responseText.trim().startsWith('<!DOCTYPE') || responseText.trim().startsWith('<html')) {
-            throw new Error('Received HTML instead of JSON - proxy may not be working.');
-          }
-          
-          data = JSON.parse(responseText);
-        } else {
-          // Use XMLHttpRequest for native platforms (direct HTTP)
-          data = await new Promise((resolve, reject) => {
-            const xhr = new XMLHttpRequest();
-            
-            xhr.open('GET', apiUrl, true);
-            xhr.setRequestHeader('Accept', 'application/json');
-            
-            xhr.onload = function() {
-              if (xhr.status >= 200 && xhr.status < 300) {
-                try {
-                  const responseText = xhr.responseText;
-                  if (responseText.trim().startsWith('<!DOCTYPE') || responseText.trim().startsWith('<html')) {
-                    reject(new Error('Received HTML instead of JSON'));
-                  } else {
-                    const parsed = JSON.parse(responseText);
-                    resolve(parsed);
-                  }
-                } catch (e) {
-                  reject(new Error('Failed to parse JSON response: ' + e.message));
-                }
-              } else {
-                reject(new Error(`HTTP error! status: ${xhr.status}`));
+          xhr.onload = function() {
+            if (xhr.status >= 200 && xhr.status < 300) {
+              try {
+                const parsed = JSON.parse(xhr.responseText);
+                resolve(parsed);
+              } catch (e) {
+                reject(new Error('Failed to parse JSON: ' + e.message));
               }
-            };
-            
-            xhr.onerror = function() {
-              reject(new Error('Network error - check if server is reachable'));
-            };
-            
-            xhr.ontimeout = function() {
-              reject(new Error('Request timeout'));
-            };
-            
-            xhr.timeout = 10000;
-            
-            try {
-              xhr.send();
-            } catch (e) {
-              reject(new Error('Failed to send request: ' + e.message));
+            } else {
+              reject(new Error(`HTTP error! status: ${xhr.status}`));
             }
-          });
-        }
+          };
+          
+          xhr.onerror = function() {
+            reject(new Error('Network error'));
+          };
+          
+          xhr.ontimeout = function() {
+            reject(new Error('Request timeout'));
+          };
+          
+          xhr.timeout = 30000; // 30 seconds
+          xhr.send();
+        });
         
         console.log('✅ Chain data received via XMLHttpRequest:', data);
         

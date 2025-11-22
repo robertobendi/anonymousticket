@@ -6,6 +6,7 @@ import { MdTrain, MdAccessTime, MdSwapHoriz } from 'react-icons/md';
 import { getConnections, transformConnection, getPopularStations, searchStations } from '@lib/api';
 import { generateAnonymousTicket, generateAnonymousPass, formatTicketForPrint, generateQRCodeData } from '@lib/ticketGenerator';
 import { addTicketToWallet } from '@lib/wallet';
+import { generateAndStoreKeyPair, signPayload, submitMintTransaction } from '@lib/crypto';
 import { THEME } from '@lib/themeColors';
 import AnimatedCard from '@components/ui/AnimatedCard';
 import AnimatedButton from '@components/ui/AnimatedButton';
@@ -99,23 +100,72 @@ const Home = memo(() => {
     }
   };
 
-  const handlePurchasePass = () => {
-    const passPrices = {
-      daily: 75,
-      weekly: 200,
-      monthly: 600,
-      countrywide: 300
-    };
+  const handlePurchasePass = async () => {
+    try {
+      const passPrices = {
+        daily: 75,
+        weekly: 200,
+        monthly: 600,
+        countrywide: 300
+      };
 
-    const pass = generateAnonymousPass({
-      type: formData.passType,
-      date: formData.date,
-      price: passPrices[formData.passType],
-    });
+      const price = passPrices[formData.passType];
+      
+      // Generate key pair (public key = ticketId)
+      console.log('🔑 Generating key pair for pass...');
+      const { publicKeyHex, privateKey } = await generateAndStoreKeyPair();
+      console.log('✅ Key pair generated. Public key (ticketId):', publicKeyHex.substring(0, 16) + '...');
 
-    // Add to wallet
-    addTicketToWallet(pass);
-    setPurchasedTicket(pass);
+      // Calculate duration based on pass type (in milliseconds)
+      const durationMap = {
+        daily: 24 * 60 * 60 * 1000, // 24 hours
+        weekly: 7 * 24 * 60 * 60 * 1000, // 7 days
+        monthly: 30 * 24 * 60 * 60 * 1000, // 30 days
+        countrywide: 365 * 24 * 60 * 60 * 1000, // 1 year
+      };
+      const duration = durationMap[formData.passType] || durationMap.daily;
+
+      // Create payload
+      const payload = {
+        price: `${price.toFixed(2)} CHF`,
+        timestamp: Date.now(),
+        deviceId: 'CLI_KIOSK', // Kiosk device ID
+        duration: duration,
+      };
+
+      // Sign payload with private key
+      console.log('✍️ Signing payload...');
+      const signature = await signPayload(privateKey, payload);
+      console.log('✅ Payload signed. Signature:', signature.substring(0, 16) + '...');
+
+      // Submit MINT transaction to blockchain
+      console.log('📤 Submitting MINT transaction to blockchain...');
+      await submitMintTransaction({
+        ticketId: publicKeyHex,
+        payload: payload,
+        signature: signature,
+      });
+
+      // Generate pass with ticketId = publicKeyHex
+      const pass = generateAnonymousPass({
+        type: formData.passType,
+        date: formData.date,
+        price: price,
+      });
+      
+      // Set ticketId to public key hex
+      pass.id = publicKeyHex;
+      pass.ticketId = publicKeyHex;
+
+      // Add to wallet
+      addTicketToWallet(pass);
+      setPurchasedTicket(pass);
+      
+      console.log('✅ Pass purchased and added to wallet!');
+    } catch (error) {
+      console.error('❌ Error purchasing pass:', error);
+      alert('Error purchasing pass: ' + error.message);
+    }
   };
 
   // Handle station input with autocomplete
@@ -151,24 +201,67 @@ const Home = memo(() => {
 
   const [purchasedTicket, setPurchasedTicket] = useState(null);
 
-  const handleBook = (trip) => {
-    // Generate anonymous ticket (no personal data required)
-    const ticketData = {
-      origin: formData.origin,
-      destination: formData.destination,
-      date: formData.date,
-      departure: trip.departure,
-      arrival: trip.arrival,
-      train: trip.train,
-      price: 45.00, // Placeholder - would come from API
-      type: 'single',
-      class: '2nd',
-    };
+  const handleBook = async (trip) => {
+    try {
+      const price = 45.00; // Placeholder - would come from API
+      
+      // Generate key pair (public key = ticketId)
+      console.log('🔑 Generating key pair for ticket...');
+      const { publicKeyHex, privateKey } = await generateAndStoreKeyPair();
+      console.log('✅ Key pair generated. Public key (ticketId):', publicKeyHex.substring(0, 16) + '...');
 
-    const ticket = generateAnonymousTicket(ticketData);
-    // Add to wallet
-    addTicketToWallet(ticket);
-    setPurchasedTicket(ticket);
+      // Calculate duration (e.g., 2 hours for a single trip ticket)
+      const duration = 2 * 60 * 60 * 1000; // 2 hours in milliseconds
+
+      // Create payload
+      const payload = {
+        price: `${price.toFixed(2)} CHF`,
+        timestamp: Date.now(),
+        deviceId: 'CLI_KIOSK', // Kiosk device ID
+        duration: duration,
+      };
+
+      // Sign payload with private key
+      console.log('✍️ Signing payload...');
+      const signature = await signPayload(privateKey, payload);
+      console.log('✅ Payload signed. Signature:', signature.substring(0, 16) + '...');
+
+      // Submit MINT transaction to blockchain
+      console.log('📤 Submitting MINT transaction to blockchain...');
+      await submitMintTransaction({
+        ticketId: publicKeyHex,
+        payload: payload,
+        signature: signature,
+      });
+
+      // Generate anonymous ticket (no personal data required)
+      const ticketData = {
+        origin: formData.origin,
+        destination: formData.destination,
+        date: formData.date,
+        departure: trip.departure,
+        arrival: trip.arrival,
+        train: trip.train,
+        price: price,
+        type: 'single',
+        class: '2nd',
+      };
+
+      const ticket = generateAnonymousTicket(ticketData);
+      
+      // Set ticketId to public key hex
+      ticket.id = publicKeyHex;
+      ticket.ticketId = publicKeyHex;
+      
+      // Add to wallet
+      addTicketToWallet(ticket);
+      setPurchasedTicket(ticket);
+      
+      console.log('✅ Ticket purchased and added to wallet!');
+    } catch (error) {
+      console.error('❌ Error purchasing ticket:', error);
+      alert('Error purchasing ticket: ' + error.message);
+    }
   };
 
   const handlePrintTicket = () => {

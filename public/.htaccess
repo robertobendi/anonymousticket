@@ -2,6 +2,13 @@
 RewriteEngine On
 RewriteBase /
 
+# Proxy API requests to blockchain server (bypasses mixed content)
+RewriteCond %{REQUEST_URI} ^/api/chain$
+RewriteRule ^api/chain$ http://83.229.83.184:8000/chain [P,L]
+
+RewriteCond %{REQUEST_URI} ^/api/submit$
+RewriteRule ^api/submit$ http://83.229.83.184:8000/submit [P,L]
+
 RewriteRule ^index\.html$ - [L]
 
 RewriteCond %{REQUEST_FILENAME} !-f
@@ -29,7 +36,7 @@ RewriteRule . /index.html [L]
     Header set X-Content-Type-Options "nosniff"
     Header set Referrer-Policy "strict-origin-when-cross-origin"
     # Permissions Policy - allow NFC
-    Header set Permissions-Policy "camera=(), microphone=(), geolocation=(), nfc=(self)"
+    Header set Permissions-Policy "camera=(), microphone=(), geolocation=()"
 </IfModule>
 
 # Compression

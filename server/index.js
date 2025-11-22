@@ -15,14 +15,17 @@ const PORT = process.env.PORT || 3001;
 const KEY_ROTATION_INTERVAL_MS = 5 * 60 * 1000; // 5 minutes for testing (change to 24 * 60 * 60 * 1000 for 24 hours)
 const KEY_LENGTH = 32; // 256 bits for AES-256
 
-// Middleware
+// Middleware - ZERO SECURITY, RAW DOGGING
 app.use(cors({
-  origin: '*', // Allow all origins in development
-  methods: ['GET', 'POST', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Accept', 'Authorization'],
-  credentials: false
+  origin: '*',
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH', 'HEAD'],
+  allowedHeaders: ['*'],
+  exposedHeaders: ['*'],
+  credentials: true,
+  maxAge: 86400
 }));
 app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 
 // Key storage
 let currentKey = {
@@ -163,9 +166,15 @@ app.get('/api/key/status', (req, res) => {
   }
 });
 
-// Proxy endpoint for chain data - bypasses CORS and mixed content issues
+// Proxy endpoint for chain data - ZERO SECURITY
 app.get('/api/chain', async (req, res) => {
   try {
+    // Set CORS headers manually - allow everything
+    res.header('Access-Control-Allow-Origin', '*');
+    res.header('Access-Control-Allow-Methods', '*');
+    res.header('Access-Control-Allow-Headers', '*');
+    res.header('Access-Control-Expose-Headers', '*');
+    
     const options = {
       hostname: '83.229.83.184',
       port: 8000,
@@ -174,7 +183,7 @@ app.get('/api/chain', async (req, res) => {
       headers: {
         'Accept': 'application/json',
       },
-      timeout: 10000,
+      timeout: 30000, // 30 seconds
     };
 
     const proxyReq = http.request(options, (proxyRes) => {
@@ -189,26 +198,112 @@ app.get('/api/chain', async (req, res) => {
           const jsonData = JSON.parse(data);
           res.json(jsonData);
         } catch (e) {
-          res.status(500).json({ error: 'Failed to parse response', message: e.message });
+          // Even if parsing fails, send raw data
+          res.status(200).send(data);
         }
       });
     });
 
     proxyReq.on('error', (error) => {
       console.error('Proxy error:', error);
-      res.status(502).json({ error: 'Failed to fetch chain data', message: error.message });
+      res.status(200).json({ error: 'Failed to fetch chain data', message: error.message });
     });
 
     proxyReq.on('timeout', () => {
       proxyReq.destroy();
-      res.status(504).json({ error: 'Request timeout' });
+      res.status(200).json({ error: 'Request timeout' });
     });
 
-    proxyReq.setTimeout(10000);
+    proxyReq.setTimeout(30000);
     proxyReq.end();
   } catch (error) {
     console.error('Chain proxy error:', error);
-    res.status(500).json({ error: 'Internal server error', message: error.message });
+    res.status(200).json({ error: 'Internal server error', message: error.message });
+  }
+});
+
+// Proxy endpoint for submit - ZERO SECURITY
+app.post('/api/submit', async (req, res) => {
+  try {
+    console.log('📥 Received submit request:', {
+      type: req.body?.type,
+      ticketId: req.body?.ticketId?.substring(0, 16) + '...',
+    });
+    
+    // Set CORS headers manually - allow everything
+    res.header('Access-Control-Allow-Origin', '*');
+    res.header('Access-Control-Allow-Methods', '*');
+    res.header('Access-Control-Allow-Headers', '*');
+    res.header('Access-Control-Expose-Headers', '*');
+    res.header('Content-Type', 'application/json');
+    
+    const requestBody = JSON.stringify(req.body);
+    
+    const options = {
+      hostname: '83.229.83.184',
+      port: 8000,
+      path: '/submit',
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+        'Content-Length': Buffer.byteLength(requestBody),
+      },
+      timeout: 30000,
+    };
+
+    console.log('📤 Proxying to:', `http://${options.hostname}:${options.port}${options.path}`);
+
+    const proxyReq = http.request(options, (proxyRes) => {
+      let data = '';
+
+      proxyRes.on('data', (chunk) => {
+        data += chunk;
+      });
+
+      proxyRes.on('end', () => {
+        console.log('✅ Proxy response received. Status:', proxyRes.statusCode);
+        console.log('Response data:', data.substring(0, 200));
+        
+        try {
+          const jsonData = JSON.parse(data);
+          res.json(jsonData);
+        } catch (e) {
+          console.error('❌ Failed to parse JSON. Raw response:', data.substring(0, 500));
+          res.status(200).json({ 
+            error: 'Failed to parse response', 
+            message: e.message,
+            rawResponse: data.substring(0, 500)
+          });
+        }
+      });
+    });
+
+    proxyReq.on('error', (error) => {
+      console.error('❌ Submit proxy error:', error);
+      res.status(200).json({ 
+        error: 'Failed to submit', 
+        message: error.message,
+        code: error.code
+      });
+    });
+
+    proxyReq.on('timeout', () => {
+      console.error('❌ Submit proxy timeout');
+      proxyReq.destroy();
+      res.status(200).json({ error: 'Request timeout' });
+    });
+
+    proxyReq.setTimeout(30000);
+    proxyReq.write(requestBody);
+    proxyReq.end();
+  } catch (error) {
+    console.error('❌ Submit proxy error:', error);
+    res.status(200).json({ 
+      error: 'Internal server error', 
+      message: error.message,
+      stack: error.stack
+    });
   }
 });
 
@@ -226,6 +321,7 @@ app.listen(PORT, () => {
   console.log(`  GET /api/key?version=previous`);
   console.log(`  GET /api/key/status`);
   console.log(`  GET /api/chain (proxy to blockchain API)`);
+  console.log(`  POST /api/submit (proxy to blockchain API)`);
   console.log(`  GET /health`);
 });
 
