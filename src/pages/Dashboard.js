@@ -1,7 +1,8 @@
-import { useState, useEffect, memo } from 'react';
+import { useState, useEffect, useCallback, memo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { FiBarChart2, FiTrendingUp, FiCheckCircle, FiRefreshCw, FiArrowLeft, FiCalendar, FiMapPin, FiX, FiMenu } from 'react-icons/fi';
+import { Capacitor } from '@capacitor/core';
+import { FiBarChart2, FiTrendingUp, FiCheckCircle, FiRefreshCw, FiArrowLeft, FiCalendar, FiMapPin, FiX, FiMenu, FiLink, FiHash, FiClock, FiShield } from 'react-icons/fi';
 import { THEME } from '@lib/themeColors';
 import SwitzerlandMap from '@components/SwitzerlandMap';
 import AnimatedCard from '@components/ui/AnimatedCard';
@@ -55,6 +56,8 @@ const Dashboard = memo(() => {
     verified: 0
   });
   const [cantonStats, setCantonStats] = useState({});
+  const [chainData, setChainData] = useState(null);
+  const [showChainExplorer, setShowChainExplorer] = useState(false);
 
   useEffect(() => {
     // Simulate API call to blockchain
@@ -76,6 +79,100 @@ const Dashboard = memo(() => {
 
     fetchStats();
   }, []);
+
+  // Fetch chain data function - uses proxy endpoint to bypass CORS
+  const fetchChainData = useCallback(async (retries = 3) => {
+    // Always use direct blockchain API URL - bypasses all proxy issues
+    // The blockchain server at 83.229.83.184:8000 must have CORS enabled
+    const apiUrl = 'http://83.229.83.184:8000/chain';
+    
+    for (let attempt = 1; attempt <= retries; attempt++) {
+      try {
+        setIsLoading(true);
+        console.log(`📡 Fetching chain data from ${apiUrl}... (attempt ${attempt}/${retries})`);
+        
+        let data;
+        
+        // Always use XMLHttpRequest - it handles HTTP better than fetch
+        // XMLHttpRequest respects usesCleartextTraffic on Android and doesn't auto-upgrade to HTTPS
+        data = await new Promise((resolve, reject) => {
+          const xhr = new XMLHttpRequest();
+          
+          // Use the URL as-is (already HTTP)
+          xhr.open('GET', apiUrl, true);
+          xhr.setRequestHeader('Accept', 'application/json');
+          
+          xhr.onload = function() {
+            if (xhr.status >= 200 && xhr.status < 300) {
+              try {
+                const responseText = xhr.responseText;
+                // Check if we got HTML instead of JSON (proxy not working)
+                if (responseText.trim().startsWith('<!DOCTYPE') || responseText.trim().startsWith('<html')) {
+                  reject(new Error('Received HTML instead of JSON - proxy may not be working. Server may not be running.'));
+                } else {
+                  const parsed = JSON.parse(responseText);
+                  resolve(parsed);
+                }
+              } catch (e) {
+                reject(new Error('Failed to parse JSON response: ' + e.message));
+              }
+            } else {
+              reject(new Error(`HTTP error! status: ${xhr.status}`));
+            }
+          };
+          
+          xhr.onerror = function() {
+            reject(new Error('Network error - check if server is reachable'));
+          };
+          
+          xhr.ontimeout = function() {
+            reject(new Error('Request timeout'));
+          };
+          
+          // Set timeout to 10 seconds
+          xhr.timeout = 10000;
+          
+          try {
+            xhr.send();
+          } catch (e) {
+            reject(new Error('Failed to send request: ' + e.message));
+          }
+        });
+        
+        console.log('✅ Chain data received via XMLHttpRequest:', data);
+        
+        if (data.success && data.data) {
+          setChainData(data.data);
+        } else if (data.blocks) {
+          // Handle case where data is directly the chain data
+          setChainData(data);
+        } else {
+          throw new Error('Invalid data format received from API');
+        }
+        
+        setIsLoading(false);
+        return; // Success, exit retry loop
+      } catch (error) {
+        console.error(`❌ Error fetching chain data (attempt ${attempt}/${retries}):`, error);
+        
+        if (attempt === retries) {
+          // Last attempt failed, show error but don't set fallback data
+          setIsLoading(false);
+          console.warn('⚠️ All retry attempts failed. Will retry when explorer is opened.');
+        } else {
+          // Wait before retrying (exponential backoff)
+          await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
+        }
+      }
+    }
+  }, []);
+
+  // Fetch chain data when explorer is shown
+  useEffect(() => {
+    if (showChainExplorer) {
+      fetchChainData();
+    }
+  }, [showChainExplorer, fetchChainData]);
 
   useEffect(() => {
     // Fetch stats for selected cantons
@@ -581,6 +678,315 @@ const Dashboard = memo(() => {
             </motion.div>
           )}
         </AnimatePresence>
+
+        {/* Chain Explorer */}
+        <AnimatedCard className="p-4 sm:p-6 rounded-lg mb-4 sm:mb-6" style={{ backgroundColor: THEME.card, border: `2px solid ${THEME.border}`, borderRadius: '8px' }}>
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 flex items-center justify-center" style={{ backgroundColor: `${THEME.accent}20` }}>
+                <FiLink size={20} style={{ color: THEME.accent }} />
+              </div>
+              <div>
+                <h2 className="text-lg font-bold" style={{ color: THEME.text }}>
+                  Chain Explorer
+                </h2>
+                <p className="text-xs" style={{ color: THEME.textMuted }}>
+                  Explore the blockchain blocks and transactions
+                </p>
+                {showChainExplorer && (
+                  <p className="text-xs mt-1" style={{ color: THEME.accent }}>
+                    📡 Loading from: http://83.229.83.184:8000/chain
+                  </p>
+                )}
+              </div>
+            </div>
+            <div className="flex gap-2">
+              {showChainExplorer && (
+                <AnimatedButton
+                  onClick={() => fetchChainData()}
+                  disabled={isLoading}
+                  loading={isLoading}
+                  variant="secondary"
+                  className="px-3 py-2 text-xs font-bold uppercase min-h-[44px]"
+                  icon={FiRefreshCw}
+                >
+                  Refresh
+                </AnimatedButton>
+              )}
+              <motion.button
+                onClick={() => setShowChainExplorer(!showChainExplorer)}
+                className="px-4 py-2 text-xs font-bold uppercase min-h-[44px]"
+                style={{ 
+                  color: THEME.textMuted,
+                  border: `1px solid ${THEME.border}`,
+                  backgroundColor: showChainExplorer ? `${THEME.accent}20` : 'transparent'
+                }}
+                whileHover={{ 
+                  borderColor: THEME.accent,
+                  color: THEME.accent
+                }}
+                whileTap={{ scale: 0.95 }}
+              >
+                {showChainExplorer ? 'Hide' : 'Show'}
+              </motion.button>
+            </div>
+          </div>
+
+
+          <AnimatePresence>
+            {showChainExplorer && (
+              <motion.div
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: 'auto' }}
+                exit={{ opacity: 0, height: 0 }}
+                transition={{ duration: 0.3 }}
+                className="overflow-hidden"
+              >
+                {isLoading ? (
+                  <div className="flex flex-col items-center justify-center py-8">
+                    <motion.div
+                      animate={{ rotate: 360 }}
+                      transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                      className="w-12 h-12 rounded-full flex items-center justify-center mb-4"
+                      style={{ backgroundColor: `${THEME.accent}20` }}
+                    >
+                      <FiRefreshCw size={24} style={{ color: THEME.accent }} />
+                    </motion.div>
+                    <p className="text-sm font-bold" style={{ color: THEME.text }}>
+                      Loading chain data...
+                    </p>
+                    <p className="text-xs mt-1" style={{ color: THEME.textMuted }}>
+                      Fetching from http://83.229.83.184:8000/chain
+                    </p>
+                  </div>
+                ) : chainData ? (
+                  <>
+                    {/* Chain Stats */}
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
+                  <div className="p-3 rounded-lg" style={{ backgroundColor: `${THEME.accent}10` }}>
+                    <div className="text-xs font-bold mb-1" style={{ color: THEME.textMuted }}>Height</div>
+                    <div className="text-lg font-bold" style={{ color: THEME.text }}>
+                      {chainData.height}
+                    </div>
+                  </div>
+                  <div className="p-3 rounded-lg" style={{ backgroundColor: `${THEME.accent}10` }}>
+                    <div className="text-xs font-bold mb-1" style={{ color: THEME.textMuted }}>Difficulty</div>
+                    <div className="text-lg font-bold" style={{ color: THEME.text }}>
+                      {chainData.difficulty}
+                    </div>
+                  </div>
+                  <div className="p-3 rounded-lg" style={{ backgroundColor: `${THEME.accent}10` }}>
+                    <div className="text-xs font-bold mb-1" style={{ color: THEME.textMuted }}>Blocks</div>
+                    <div className="text-lg font-bold" style={{ color: THEME.text }}>
+                      {chainData.blocks?.length || 0}
+                    </div>
+                  </div>
+                  <div className="p-3 rounded-lg" style={{ backgroundColor: `${THEME.accent}10` }}>
+                    <div className="text-xs font-bold mb-1" style={{ color: THEME.textMuted }}>Pending</div>
+                    <div className="text-lg font-bold" style={{ color: THEME.text }}>
+                      {chainData.pending?.length || 0}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Simple Blockchain Visualization */}
+                {chainData.blocks && chainData.blocks.length > 0 && (
+                  <div className="space-y-4">
+                    {/* Simple Block Chain */}
+                    <div className="p-4 rounded-lg border-2" style={{ 
+                      backgroundColor: THEME.background,
+                      borderColor: THEME.border,
+                      borderRadius: '12px'
+                    }}>
+                      <h3 className="text-base font-bold mb-4" style={{ color: THEME.text }}>
+                        Blockchain
+                      </h3>
+                      <div className="overflow-x-auto pb-4">
+                        <div className="flex items-center gap-3 min-w-max">
+                          {chainData.blocks.map((block, blockIndex) => {
+                            const txCount = block.transactions?.length || 0;
+                            
+                            return (
+                              <motion.div
+                                key={block.index}
+                                initial={{ opacity: 0, scale: 0.9 }}
+                                animate={{ opacity: 1, scale: 1 }}
+                                transition={{ delay: blockIndex * 0.1 }}
+                                className="flex items-center gap-3"
+                              >
+                                {/* Block */}
+                                <motion.div
+                                  className="p-4 rounded-lg border-2 text-center min-w-[120px]"
+                                  style={{ 
+                                    backgroundColor: txCount > 0 ? `${THEME.success}15` : THEME.card,
+                                    borderColor: txCount > 0 ? THEME.success : THEME.border,
+                                    borderRadius: '8px'
+                                  }}
+                                  whileHover={{ scale: 1.05 }}
+                                >
+                                  <div className="text-lg font-bold mb-1" style={{ color: THEME.text }}>
+                                    #{block.index}
+                                  </div>
+                                  <div className="text-xs mb-1" style={{ color: THEME.textMuted }}>
+                                    {txCount} {txCount === 1 ? 'tx' : 'txs'}
+                                  </div>
+                                  {block.nonce !== undefined && (
+                                    <div className="text-xs mb-1" style={{ color: THEME.textMuted }}>
+                                      Nonce: {block.nonce}
+                                    </div>
+                                  )}
+                                  {block.hash && (
+                                    <div className="text-xs font-mono truncate" style={{ color: THEME.accent }} title={block.hash}>
+                                      {block.hash.substring(0, 8)}...
+                                    </div>
+                                  )}
+                                  <div className="text-xs mt-1" style={{ color: THEME.textMuted }}>
+                                    {new Date(block.timestamp).toLocaleTimeString()}
+                                  </div>
+                                </motion.div>
+                                
+                                {/* Arrow */}
+                                {blockIndex < chainData.blocks.length - 1 && (
+                                  <FiLink size={20} style={{ color: THEME.accent }} />
+                                )}
+                              </motion.div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Transactions List with More Data */}
+                    {chainData.blocks.some(b => b.transactions && b.transactions.length > 0) && (
+                      <div className="p-4 rounded-lg border-2" style={{ 
+                        backgroundColor: THEME.background,
+                        borderColor: THEME.border,
+                        borderRadius: '12px'
+                      }}>
+                        <h3 className="text-base font-bold mb-4" style={{ color: THEME.text }}>
+                          All Transactions ({chainData.blocks.reduce((sum, b) => sum + (b.transactions?.length || 0), 0)})
+                        </h3>
+                        <div className="space-y-3">
+                          {chainData.blocks.map((block) => 
+                            block.transactions?.map((tx, txIndex) => (
+                              <motion.div
+                                key={tx.id || `${block.index}-${txIndex}`}
+                                initial={{ opacity: 0, y: 10 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                transition={{ delay: (block.index * 0.05) + (txIndex * 0.02) }}
+                                className="p-4 rounded-lg border"
+                                style={{ 
+                                  backgroundColor: THEME.card,
+                                  borderColor: THEME.border,
+                                  borderRadius: '8px'
+                                }}
+                              >
+                                <div className="flex items-start justify-between mb-2">
+                                  <div className="flex items-center gap-3">
+                                    <div className="px-2 py-1 rounded text-xs font-bold" style={{ 
+                                      backgroundColor: tx.type === 'MINT' ? `${THEME.success}30` : `${THEME.accent}30`,
+                                      color: tx.type === 'MINT' ? THEME.success : THEME.accent
+                                    }}>
+                                      {tx.type}
+                                    </div>
+                                    <div>
+                                      <div className="text-sm font-bold" style={{ color: THEME.text }}>
+                                        Block #{block.index}
+                                      </div>
+                                      <div className="text-xs flex items-center gap-2 mt-1" style={{ color: THEME.textMuted }}>
+                                        <FiClock size={12} />
+                                        {tx.payload?.timestamp ? new Date(tx.payload.timestamp).toLocaleString() : new Date(block.timestamp).toLocaleString()}
+                                      </div>
+                                    </div>
+                                  </div>
+                                  {tx.payload?.price && (
+                                    <div className="text-sm font-bold" style={{ color: THEME.success }}>
+                                      {tx.payload.price}
+                                    </div>
+                                  )}
+                                </div>
+                                
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-3 text-xs">
+                                  {tx.ticketId && (
+                                    <div>
+                                      <span className="font-bold" style={{ color: THEME.textMuted }}>Ticket ID: </span>
+                                      <span className="font-mono" style={{ color: THEME.text }}>
+                                        {tx.ticketId.substring(0, 16)}...
+                                      </span>
+                                    </div>
+                                  )}
+                                  {tx.payload?.deviceId && (
+                                    <div>
+                                      <span className="font-bold" style={{ color: THEME.textMuted }}>Device: </span>
+                                      <span style={{ color: THEME.text }}>{tx.payload.deviceId}</span>
+                                    </div>
+                                  )}
+                                  {tx.payload?.duration && (
+                                    <div>
+                                      <span className="font-bold" style={{ color: THEME.textMuted }}>Duration: </span>
+                                      <span style={{ color: THEME.text }}>
+                                        {Math.floor(tx.payload.duration / 3600000)}h {Math.floor((tx.payload.duration % 3600000) / 60000)}min
+                                      </span>
+                                    </div>
+                                  )}
+                                  {tx.id && (
+                                    <div>
+                                      <span className="font-bold" style={{ color: THEME.textMuted }}>TX ID: </span>
+                                      <span className="font-mono" style={{ color: THEME.text }}>
+                                        {tx.id.substring(0, 8)}...
+                                      </span>
+                                    </div>
+                                  )}
+                                </div>
+                                
+                                {tx.signature && (
+                                  <div className="mt-2 p-2 rounded" style={{ backgroundColor: `${THEME.accent}10` }}>
+                                    <div className="text-xs font-mono break-all" style={{ color: THEME.text }}>
+                                      {tx.signature.substring(0, 40)}...
+                                    </div>
+                                  </div>
+                                )}
+                              </motion.div>
+                            ))
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Pending Transactions */}
+                {chainData.pending && chainData.pending.length > 0 && (
+                  <div className="mt-6 p-4 rounded-lg border-2" style={{ 
+                    backgroundColor: `${THEME.accent}10`,
+                    borderColor: THEME.accent,
+                    borderRadius: '8px'
+                  }}>
+                    <div className="text-sm font-bold mb-3" style={{ color: THEME.text }}>
+                      Pending Transactions ({chainData.pending.length})
+                    </div>
+                    <div className="space-y-2">
+                      {chainData.pending.map((tx, index) => (
+                        <div key={index} className="text-xs p-2 rounded" style={{ backgroundColor: THEME.background }}>
+                          <span className="font-mono" style={{ color: THEME.text }}>
+                            {tx.id || `Pending ${index + 1}`}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                  </>
+                ) : (
+                  <div className="p-4 text-center" style={{ color: THEME.textMuted }}>
+                    <p className="text-sm">No chain data available</p>
+                    <p className="text-xs mt-2">Data will load automatically from API</p>
+                  </div>
+                )}
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </AnimatedCard>
 
         {/* Info Box */}
         <AnimatedCard className="p-4 sm:p-6 rounded-lg" style={{ backgroundColor: THEME.card, border: `2px solid ${THEME.border}`, borderRadius: '8px' }}>

@@ -23,6 +23,7 @@ const Verify = memo(() => {
   const [nfcAvailable, setNfcAvailable] = useState(false);
   const [showRawData, setShowRawData] = useState(false);
   const [isContinuousMode, setIsContinuousMode] = useState(false);
+  const [isVerifying, setIsVerifying] = useState(false);
 
   useEffect(() => {
     // Check NFC availability - don't request permission on load to avoid blocking
@@ -43,10 +44,23 @@ const Verify = memo(() => {
     checkNFCStatus();
   }, []);
 
+  // Helper function to set verification result with cooldown
+  const setVerificationResultWithCooldown = async (result) => {
+    setIsVerifying(true);
+    setIsReading(false);
+    
+    // Wait for cooldown (1.5 seconds)
+    await new Promise(resolve => setTimeout(resolve, 1500));
+    
+    setIsVerifying(false);
+    setVerificationResult(result);
+  };
+
   const handleReadNFC = async () => {
     setIsReading(true);
     setError(null);
     setVerificationResult(null);
+    setIsVerifying(false);
 
     try {
       // Request NFC permission first (shows Android system dialog)
@@ -116,7 +130,7 @@ const Verify = memo(() => {
       // Check if parsed data is valid
       if (!parsedData || (!parsedData.ticketId && !parsedData.id)) {
         console.warn('Invalid ticket format - no ticket ID found');
-        setVerificationResult({
+        await setVerificationResultWithCooldown({
           valid: false,
           message: 'Invalid ticket format - no ticket ID found. Raw NFC data available below.',
           ticketId: null,
@@ -128,7 +142,6 @@ const Verify = memo(() => {
           rawData: ticketDataString,
         });
         setShowRawData(true); // Auto-expand for invalid tickets
-        setIsReading(false);
         return;
       }
 
@@ -142,7 +155,7 @@ const Verify = memo(() => {
       });
       console.log('Verification result:', verification);
       
-      setVerificationResult({
+      await setVerificationResultWithCooldown({
         valid: verification.valid,
         message: verification.message,
         ticketId: ticketId,
@@ -159,7 +172,6 @@ const Verify = memo(() => {
         rawTagId: tagId,
         rawData: ticketDataString,
       });
-      setIsReading(false);
 
     } catch (error) {
       console.error('NFC read error:', error);
@@ -176,7 +188,7 @@ const Verify = memo(() => {
     }
   };
 
-  const handleManualVerify = () => {
+  const handleManualVerify = async () => {
     const input = prompt('Enter ticket ID or control code:');
     if (!input) return;
 
@@ -184,7 +196,7 @@ const Verify = memo(() => {
     const parsed = parseQRCodeData(input) || { ticketId: input };
     const verification = verifyTicket(parsed);
     
-    setVerificationResult({
+    await setVerificationResultWithCooldown({
       valid: verification.valid,
       message: verification.message,
       ticketId: parsed.ticketId || input,
@@ -343,9 +355,45 @@ const Verify = memo(() => {
           )}
         </AnimatePresence>
 
+        {/* Verification Cooldown Loading */}
+        <AnimatePresence>
+          {isVerifying && (
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="p-6 sm:p-8 border-2 rounded-lg mb-4 sm:mb-6"
+              style={{ 
+                backgroundColor: `${THEME.accent}15`,
+                borderColor: THEME.accent,
+                borderRadius: '12px'
+              }}
+            >
+              <div className="flex flex-col items-center justify-center gap-4">
+                <motion.div
+                  animate={{ rotate: 360 }}
+                  transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                  className="w-16 h-16 sm:w-20 sm:h-20 rounded-full flex items-center justify-center"
+                  style={{ backgroundColor: THEME.accent }}
+                >
+                  <FiRadio size={32} className="text-white" style={{ width: '32px', height: '32px' }} />
+                </motion.div>
+                <div className="text-center">
+                  <h3 className="text-lg font-bold mb-2" style={{ color: THEME.text }}>
+                    Verifying Ticket...
+                  </h3>
+                  <p className="text-sm" style={{ color: THEME.textMuted }}>
+                    Please wait while we verify the ticket
+                  </p>
+                </div>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
         {/* Verification Result */}
         <AnimatePresence>
-          {verificationResult && (
+          {verificationResult && !isVerifying && (
             <motion.div
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}

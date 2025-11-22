@@ -6,6 +6,7 @@
 const express = require('express');
 const cors = require('cors');
 const crypto = require('crypto');
+const http = require('http');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -15,7 +16,12 @@ const KEY_ROTATION_INTERVAL_MS = 5 * 60 * 1000; // 5 minutes for testing (change
 const KEY_LENGTH = 32; // 256 bits for AES-256
 
 // Middleware
-app.use(cors());
+app.use(cors({
+  origin: '*', // Allow all origins in development
+  methods: ['GET', 'POST', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Accept', 'Authorization'],
+  credentials: false
+}));
 app.use(express.json());
 
 // Key storage
@@ -157,6 +163,55 @@ app.get('/api/key/status', (req, res) => {
   }
 });
 
+// Proxy endpoint for chain data - bypasses CORS and mixed content issues
+app.get('/api/chain', async (req, res) => {
+  try {
+    const options = {
+      hostname: '83.229.83.184',
+      port: 8000,
+      path: '/chain',
+      method: 'GET',
+      headers: {
+        'Accept': 'application/json',
+      },
+      timeout: 10000,
+    };
+
+    const proxyReq = http.request(options, (proxyRes) => {
+      let data = '';
+
+      proxyRes.on('data', (chunk) => {
+        data += chunk;
+      });
+
+      proxyRes.on('end', () => {
+        try {
+          const jsonData = JSON.parse(data);
+          res.json(jsonData);
+        } catch (e) {
+          res.status(500).json({ error: 'Failed to parse response', message: e.message });
+        }
+      });
+    });
+
+    proxyReq.on('error', (error) => {
+      console.error('Proxy error:', error);
+      res.status(502).json({ error: 'Failed to fetch chain data', message: error.message });
+    });
+
+    proxyReq.on('timeout', () => {
+      proxyReq.destroy();
+      res.status(504).json({ error: 'Request timeout' });
+    });
+
+    proxyReq.setTimeout(10000);
+    proxyReq.end();
+  } catch (error) {
+    console.error('Chain proxy error:', error);
+    res.status(500).json({ error: 'Internal server error', message: error.message });
+  }
+});
+
 // Health check endpoint
 app.get('/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
@@ -170,6 +225,7 @@ app.listen(PORT, () => {
   console.log(`  GET /api/key?version=current (default)`);
   console.log(`  GET /api/key?version=previous`);
   console.log(`  GET /api/key/status`);
+  console.log(`  GET /api/chain (proxy to blockchain API)`);
   console.log(`  GET /health`);
 });
 
