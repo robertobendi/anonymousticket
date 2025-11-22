@@ -1,7 +1,8 @@
 import { useState, useEffect, memo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { FiRadio, FiCheckCircle, FiXCircle, FiAlertCircle, FiRefreshCw, FiArrowLeft } from 'react-icons/fi';
-import { isNFCAvailable, readNFC, parseNFCTicketData, requestNFCPermission } from '@lib/nfc';
+import { FiRadio, FiCheckCircle, FiXCircle, FiAlertCircle, FiRefreshCw, FiArrowLeft, FiChevronDown, FiChevronUp } from 'react-icons/fi';
+import { checkNFC, startReading, requestNFCPermission } from '@lib/nfc-simple';
+import { parseNFCTicketData } from '@lib/nfc';
 import { verifyTicket, parseQRCodeData } from '@lib/ticketGenerator';
 import { THEME } from '@lib/themeColors';
 
@@ -15,16 +16,25 @@ const Verify = memo(() => {
   const [verificationResult, setVerificationResult] = useState(null);
   const [error, setError] = useState(null);
   const [nfcAvailable, setNfcAvailable] = useState(false);
+  const [showRawData, setShowRawData] = useState(false);
 
   useEffect(() => {
-    // Check NFC availability asynchronously to get accurate status
-    const checkNFC = async () => {
-      const { isNFCAvailableAsync } = await import('@lib/nfc');
-      const available = await isNFCAvailableAsync();
-      setNfcAvailable(available);
-      console.log('NFC availability check:', available);
+    // Check NFC availability - don't request permission on load to avoid blocking
+    const checkNFCStatus = async () => {
+      try {
+        // Wait a bit for WebView interface to be ready
+        await new Promise(resolve => setTimeout(resolve, 500));
+        
+        // Check status
+        const status = await checkNFC();
+        setNfcAvailable(status.available && status.enabled);
+        console.log('NFC status:', status);
+      } catch (error) {
+        console.error('NFC check failed:', error);
+        setNfcAvailable(false);
+      }
     };
-    checkNFC();
+    checkNFCStatus();
   }, []);
 
   const handleReadNFC = async () => {
@@ -33,30 +43,34 @@ const Verify = memo(() => {
     setVerificationResult(null);
 
     try {
-      // Check if NFC is available before attempting to read
-      if (!nfcAvailable) {
-        setError('NFC is not available on this device or browser. Please use Chrome on Android.');
+      // Request NFC permission first (shows Android system dialog)
+      try {
+        await requestNFCPermission();
+      } catch (e) {
+        console.warn('Permission request error (continuing anyway):', e);
+        // Continue anyway - permission might already be granted
+      }
+
+      // Check if NFC is available
+      const status = await checkNFC();
+      if (!status.available) {
+        setError('NFC is not available on this device.');
+        setIsReading(false);
+        return;
+      }
+      
+      if (!status.enabled) {
+        setError('NFC is disabled. Please enable NFC in your device settings.');
         setIsReading(false);
         return;
       }
 
-      // Request NFC permission explicitly (will show system popup)
-      const hasPermission = await requestNFCPermission();
-      if (!hasPermission) {
-        // For Web NFC, permission might be requested during scan()
-        // So we continue anyway, but if it fails we'll show a better error
-      }
-
-      const nfcData = await readNFC();
+      // Start reading NFC
+      const nfcData = await startReading();
       
-      // Extract ticket data from NFC records
-      let ticketDataString = '';
-      if (nfcData.records && nfcData.records.length > 0) {
-        ticketDataString = nfcData.records[0].data || nfcData.records[0];
-      } else if (nfcData.id) {
-        // Fallback to ID if no records
-        ticketDataString = nfcData.id;
-      }
+      // Extract ticket data - simple format returns {id, data}
+      const tagId = nfcData.id || '';
+      const ticketDataString = nfcData.data || tagId;
 
       // Parse ticket data
       const parsedData = parseNFCTicketData(ticketDataString) || parseQRCodeData(ticketDataString);
@@ -65,15 +79,20 @@ const Verify = memo(() => {
       if (parsedData && parsedData.wallet && Array.isArray(parsedData.tickets)) {
         // Navigate to ReceivedTickets page with wallet data
         navigate('/received', { state: { walletData: parsedData } });
+        setIsReading(false);
         return;
       }
       
       if (!parsedData || (!parsedData.ticketId && !parsedData.id)) {
         setVerificationResult({
           valid: false,
-          message: 'Invalid ticket format',
+          message: 'Invalid ticket format - raw NFC data available below',
           ticketId: null,
+          rawTagId: tagId,
+          rawData: ticketDataString,
         });
+        setShowRawData(true); // Auto-expand for invalid tickets
+        setIsReading(false);
         return;
       }
 
@@ -89,11 +108,21 @@ const Verify = memo(() => {
         origin: parsedData.origin,
         destination: parsedData.destination,
         date: parsedData.date,
+        rawTagId: tagId,
+        rawData: ticketDataString,
       });
+      setIsReading(false);
 
     } catch (error) {
       console.error('NFC read error:', error);
-      setError(error.message || 'Failed to read NFC tag');
+      // Show detailed error message on screen
+      const errorMsg = error.message || 'Failed to read NFC tag';
+      setError(errorMsg);
+      
+      // If it's a plugin not found error, show more details
+      if (errorMsg.includes('plugin not found')) {
+        setError(`NFC Plugin Error:\n\n${errorMsg}\n\nThis means the Android plugin is not registered. The app needs to be rebuilt with NFC support.`);
+      }
     } finally {
       setIsReading(false);
     }
@@ -143,8 +172,25 @@ const Verify = memo(() => {
           </p>
         </div>
 
-        {/* NFC Availability Warning */}
-        {!nfcAvailable && (
+        {/* NFC Status Display - SHOWS ON SCREEN */}
+        <div className="p-3 sm:p-4 mb-4 sm:mb-6 border-2 rounded" style={{ backgroundColor: nfcAvailable ? `${THEME.accent}15` : '#ff000015', borderColor: nfcAvailable ? THEME.accent : '#ff0000' }}>
+          <div className="flex items-start gap-2 mb-2">
+            <FiAlertCircle size={20} style={{ color: nfcAvailable ? THEME.accent : '#ff0000', marginTop: '2px' }} />
+            <div className="flex-1">
+              <p className="font-bold text-sm mb-1" style={{ color: nfcAvailable ? THEME.accent : '#ff0000' }}>
+                {nfcAvailable ? 'NFC Ready' : 'NFC Not Available'}
+              </p>
+              <p className="text-xs" style={{ color: THEME.textMuted }}>
+                {nfcAvailable 
+                  ? 'NFC is enabled and ready to read tags'
+                  : 'NFC plugin not found. Check if app was built correctly with NFC support.'}
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* NFC Availability Warning - OLD */}
+        {false && !nfcAvailable && (
           <div className="p-3 sm:p-4 mb-4 sm:mb-6 border-2 rounded" style={{ backgroundColor: `${THEME.accent}15`, borderColor: THEME.accent }}>
             <div className="flex items-start gap-2 mb-2">
               <FiAlertCircle style={{ color: THEME.accent, marginTop: '2px', flexShrink: 0 }} size={18} />
@@ -206,12 +252,15 @@ const Verify = memo(() => {
           </button>
         </div>
 
-        {/* Error Display */}
+        {/* Error Display - SHOWS ON SCREEN */}
         {error && (
-          <div className="p-3 sm:p-4 mb-4 sm:mb-6 border-2 rounded" style={{ backgroundColor: `${THEME.accent}15`, borderColor: THEME.accent }}>
+          <div className="p-3 sm:p-4 mb-4 sm:mb-6 border-2 rounded" style={{ backgroundColor: '#ff000015', borderColor: '#ff0000' }}>
             <div className="flex items-start gap-2">
-              <FiXCircle style={{ color: THEME.accent, marginTop: '2px', flexShrink: 0 }} size={18} />
-              <span className="text-xs sm:text-sm leading-relaxed flex-1" style={{ color: THEME.accent }}>{error}</span>
+              <FiXCircle style={{ color: '#ff0000', marginTop: '2px', flexShrink: 0 }} size={18} />
+              <div className="flex-1">
+                <p className="font-bold text-sm mb-1" style={{ color: '#ff0000' }}>Error</p>
+                <pre className="text-xs sm:text-sm leading-relaxed whitespace-pre-wrap break-words" style={{ color: '#ff0000' }}>{error}</pre>
+              </div>
             </div>
           </div>
         )}
@@ -241,6 +290,66 @@ const Verify = memo(() => {
               </div>
             </div>
 
+            {/* Raw NFC Data - Always show if available, expandable */}
+            {(verificationResult.rawTagId || verificationResult.rawData) && (
+              <div className="mb-4">
+                <button
+                  onClick={() => setShowRawData(!showRawData)}
+                  className="w-full flex items-center justify-between p-3 rounded border transition-colors"
+                  style={{ 
+                    backgroundColor: showRawData ? `${THEME.accent}10` : 'transparent',
+                    borderColor: THEME.border 
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.borderColor = THEME.accent;
+                    e.currentTarget.style.backgroundColor = `${THEME.accent}10`;
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.borderColor = THEME.border;
+                    e.currentTarget.style.backgroundColor = showRawData ? `${THEME.accent}10` : 'transparent';
+                  }}
+                >
+                  <span className="text-xs sm:text-sm font-bold" style={{ color: THEME.text }}>
+                    📡 Raw NFC Data {showRawData ? '(Click to hide)' : '(Click to read more)'}
+                  </span>
+                  {showRawData ? (
+                    <FiChevronUp size={18} style={{ color: THEME.text }} />
+                  ) : (
+                    <FiChevronDown size={18} style={{ color: THEME.text }} />
+                  )}
+                </button>
+                
+                {showRawData && (
+                  <div className="mt-2 p-3 rounded border" style={{ backgroundColor: `${THEME.background}`, borderColor: THEME.border }}>
+                    <div className="space-y-2.5">
+                      {verificationResult.rawTagId && (
+                        <div>
+                          <span className="text-xs font-bold block mb-1" style={{ color: THEME.textMuted }}>Tag ID:</span>
+                          <span className="font-mono text-xs break-all block p-2 rounded" style={{ backgroundColor: `${THEME.accent}10`, color: THEME.text }}>
+                            {verificationResult.rawTagId}
+                          </span>
+                        </div>
+                      )}
+                      {verificationResult.rawData && (
+                        <div>
+                          <span className="text-xs font-bold block mb-1" style={{ color: THEME.textMuted }}>Data Read:</span>
+                          <span className="font-mono text-xs break-all block p-2 rounded whitespace-pre-wrap" style={{ backgroundColor: `${THEME.accent}10`, color: THEME.text }}>
+                            {verificationResult.rawData}
+                          </span>
+                        </div>
+                      )}
+                      {!verificationResult.rawData && verificationResult.rawTagId && (
+                        <p className="text-xs italic" style={{ color: THEME.textMuted }}>
+                          No data found on tag, only Tag ID available
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Parsed Ticket Information */}
             {verificationResult.ticketId && (
               <div className="space-y-2.5 sm:space-y-3 text-xs sm:text-sm mb-4">
                 <div className="flex justify-between items-start gap-2">
@@ -280,6 +389,7 @@ const Verify = memo(() => {
               onClick={() => {
                 setVerificationResult(null);
                 setError(null);
+                setShowRawData(false);
               }}
               className="mt-4 w-full py-3 sm:py-3.5 border-2 transition-colors font-bold text-xs sm:text-sm uppercase flex items-center justify-center gap-2 rounded"
               style={{ borderColor: THEME.border, color: THEME.text, minHeight: '44px' }}

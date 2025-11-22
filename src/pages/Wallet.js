@@ -2,7 +2,8 @@ import { useState, useEffect, memo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { FiArrowLeft, FiRadio, FiTrash2, FiSend, FiCreditCard, FiGlobe, FiAlertCircle } from 'react-icons/fi';
 import { useWallet, getWalletForNFC } from '@lib/wallet';
-import { writeNFC, isNFCAvailable } from '@lib/nfc';
+import { writeNFC } from '@lib/nfc-simple';
+import { checkNFC } from '@lib/nfc-simple';
 import { THEME } from '@lib/themeColors';
 
 /**
@@ -17,14 +18,19 @@ const Wallet = memo(() => {
   const [nfcAvailable, setNfcAvailable] = useState(false);
 
   useEffect(() => {
-    // Check NFC availability asynchronously to get accurate status
-    const checkNFC = async () => {
-      const { isNFCAvailableAsync } = await import('@lib/nfc');
-      const available = await isNFCAvailableAsync();
-      setNfcAvailable(available);
-      console.log('NFC availability check:', available);
+    // Check NFC availability
+    const checkNFCStatus = async () => {
+      try {
+        await new Promise(resolve => setTimeout(resolve, 500));
+        const status = await checkNFC();
+        setNfcAvailable(status.available && status.enabled);
+        console.log('NFC availability check:', status);
+      } catch (error) {
+        console.error('NFC check failed:', error);
+        setNfcAvailable(false);
+      }
     };
-    checkNFC();
+    checkNFCStatus();
   }, []);
 
   const handleSendWallet = async () => {
@@ -38,21 +44,18 @@ const Wallet = memo(() => {
     setSendSuccess(false);
 
     try {
-      // Check and request permission first
-      const { requestNFCPermission, isNFCAvailable } = await import('@lib/nfc');
-      
-      if (!isNFCAvailable()) {
+      // Check NFC status
+      const status = await checkNFC();
+      if (!status.available) {
         setSendError('NFC is not available on this device.');
         setIsSending(false);
         return;
       }
-
-      // Request permission (NFC is a normal permission, usually auto-granted)
-      const permissionResult = await requestNFCPermission();
-      console.log('NFC permission result:', permissionResult);
-      
-      // Note: NFC is a "normal" permission in Android, so it's auto-granted
-      // Even if granted is false, we can still try (it might work)
+      if (!status.enabled) {
+        setSendError('NFC is disabled. Please enable NFC in your device settings.');
+        setIsSending(false);
+        return;
+      }
       
       const walletData = getWalletForNFC();
       const walletJson = JSON.stringify(walletData);
@@ -169,7 +172,7 @@ const Wallet = memo(() => {
           )}
 
           <p className="text-xs" style={{ color: THEME.textMuted }}>
-            Activate NFC and hold your device near another device to share your wallet.
+            Click "Send Wallet" then hold your device near another phone (on Verify page) or an NFC tag to share your tickets.
           </p>
         </div>
 

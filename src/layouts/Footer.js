@@ -39,9 +39,9 @@ const Footer = memo(() => {
       <div className="max-w-6xl mx-auto px-4 py-4">
         <div className="flex flex-col md:flex-row justify-between items-center gap-4">
           <div className="flex flex-col items-start">
-            <p className="text-xs" style={{ color: THEME.textMuted }}>
-              © {currentYear} {site.author}
-            </p>
+          <p className="text-xs" style={{ color: THEME.textMuted }}>
+            © {currentYear} {site.author}
+          </p>
             {buildNumber && (
               <p className="text-xs mt-1" style={{ color: THEME.textMuted, opacity: 0.7 }}>
                 Build: {formatBuildNumber(buildNumber)}

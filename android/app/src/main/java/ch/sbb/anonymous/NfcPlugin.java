@@ -37,7 +37,11 @@ public class NfcPlugin extends Plugin {
 
     @Override
     public void load() {
-        android.util.Log.d("NfcPlugin", "NfcPlugin.load() called - Plugin is loading");
+        android.util.Log.d("NfcPlugin", "═══════════════════════════════════════");
+        android.util.Log.d("NfcPlugin", "NfcPlugin.load() called - Plugin is loading!");
+        android.util.Log.d("NfcPlugin", "Plugin name: Nfc");
+        android.util.Log.d("NfcPlugin", "Plugin class: ch.sbb.anonymous.NfcPlugin");
+        android.util.Log.d("NfcPlugin", "═══════════════════════════════════════");
         Activity activity = getActivity();
         nfcAdapter = NfcAdapter.getDefaultAdapter(activity.getApplicationContext());
         
@@ -82,11 +86,13 @@ public class NfcPlugin extends Plugin {
             boolean nfcEnabled = nfcAdapter.isEnabled();
             android.util.Log.d("NfcPlugin", "NFC status - enabled: " + nfcEnabled + ", hasPermission: " + hasPermission);
             
+            // Return true if NFC adapter exists and has permission
+            // Don't require NFC to be enabled - user can enable it in settings
             ret.put("enabled", nfcEnabled);
             ret.put("available", true);
             ret.put("hasPermission", hasPermission);
         } else {
-            android.util.Log.w("NfcPlugin", "NFC adapter is null");
+            android.util.Log.w("NfcPlugin", "NFC adapter is null - device doesn't have NFC");
             ret.put("enabled", false);
             ret.put("available", false);
             ret.put("hasPermission", false);
@@ -342,6 +348,7 @@ public class NfcPlugin extends Plugin {
                 data.put("id", bytesToHex(tag.getId()));
                 data.put("data", textData);
                 
+                android.util.Log.d("NfcPlugin", "Sending nfcTagScanned event: id=" + data.getString("id") + ", data=" + textData);
                 notifyListeners("nfcTagScanned", data);
             }
         }
