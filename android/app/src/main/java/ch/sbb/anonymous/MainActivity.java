@@ -29,11 +29,15 @@ public class MainActivity extends BridgeActivity {
 
 
     private void requestNFCPermission() {
-        // NFC permission is a normal permission on Android, but we check anyway
+        // NFC is a "normal" permission (auto-granted), but we still check and request it
+        // for Android 6.0+ to ensure proper handling
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            if (ContextCompat.checkSelfPermission(this, Manifest.permission.NFC) 
-                    != PackageManager.PERMISSION_GRANTED) {
-                // Request permission
+            int permissionStatus = ContextCompat.checkSelfPermission(this, Manifest.permission.NFC);
+            
+            if (permissionStatus != PackageManager.PERMISSION_GRANTED) {
+                // Request permission - this will show a dialog on some devices
+                // Note: NFC is a normal permission, so it's usually auto-granted
+                // but requesting it ensures proper setup
                 ActivityCompat.requestPermissions(
                     this,
                     new String[]{Manifest.permission.NFC},
@@ -50,8 +54,10 @@ public class MainActivity extends BridgeActivity {
         if (requestCode == NFC_PERMISSION_REQUEST_CODE) {
             if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
                 // NFC permission granted
+                android.util.Log.d("MainActivity", "NFC permission granted");
             } else {
                 // NFC permission denied
+                android.util.Log.d("MainActivity", "NFC permission denied");
             }
         }
     }

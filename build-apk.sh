@@ -36,6 +36,11 @@ fi
 echo "✓ Java found: $JAVA_HOME"
 echo "✓ Android SDK: $ANDROID_HOME"
 
+# Generate build info
+echo ""
+echo "📝 Generating build info..."
+node scripts/generate-build-info.js
+
 # Build web assets
 echo ""
 echo "📦 Building web assets..."

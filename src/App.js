@@ -1,15 +1,20 @@
 import React, { Suspense, lazy, useEffect } from "react";
 import { Routes, Route, useLocation } from "react-router-dom";
 import { THEME } from "@lib/themeColors";
+import Footer from "@layouts/Footer";
 
 // Lazy load pages
 const Home = lazy(() => import("@pages/Home"));
 const Verify = lazy(() => import("@pages/Verify"));
+const Wallet = lazy(() => import("@pages/Wallet"));
+const ReceivedTickets = lazy(() => import("@pages/ReceivedTickets"));
 
 // Routes configuration
 const routes = [
   { path: "/", element: <Home /> },
-  { path: "/verify", element: <Verify /> }
+  { path: "/verify", element: <Verify /> },
+  { path: "/wallet", element: <Wallet /> },
+  { path: "/received", element: <ReceivedTickets /> }
 ];
 
 // Loading component
@@ -107,6 +112,7 @@ function App() {
           </Suspense>
         </ErrorBoundary>
       </main>
+      <Footer />
     </div>
   );
 }

@@ -54,7 +54,14 @@ const Verify = memo(() => {
       // Parse ticket data
       const parsedData = parseNFCTicketData(ticketDataString) || parseQRCodeData(ticketDataString);
       
-      if (!parsedData || !parsedData.ticketId) {
+      // Check if this is a wallet (contains tickets array)
+      if (parsedData && parsedData.wallet && Array.isArray(parsedData.tickets)) {
+        // Navigate to ReceivedTickets page with wallet data
+        navigate('/received', { state: { walletData: parsedData } });
+        return;
+      }
+      
+      if (!parsedData || (!parsedData.ticketId && !parsedData.id)) {
         setVerificationResult({
           valid: false,
           message: 'Invalid ticket format',
@@ -64,12 +71,13 @@ const Verify = memo(() => {
       }
 
       // Verify ticket (in real app, this would check against database)
+      const ticketId = parsedData.ticketId || parsedData.id;
       const verification = verifyTicket(parsedData);
       
       setVerificationResult({
         valid: verification.valid,
         message: verification.message,
-        ticketId: parsedData.ticketId,
+        ticketId: ticketId,
         controlCode: parsedData.controlCode,
         origin: parsedData.origin,
         destination: parsedData.destination,

@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { FiMapPin, FiCalendar, FiUsers, FiSearch, FiRepeat, FiAlertCircle, FiPrinter, FiShield, FiCreditCard, FiGlobe, FiRadio } from 'react-icons/fi';
 import { getConnections, transformConnection, getPopularStations, searchStations } from '@lib/api';
 import { generateAnonymousTicket, generateAnonymousPass, formatTicketForPrint, generateQRCodeData } from '@lib/ticketGenerator';
+import { addTicketToWallet } from '@lib/wallet';
 import { THEME } from '@lib/themeColors';
 
 const SWISS_STATIONS = getPopularStations();
@@ -105,6 +106,8 @@ const Home = memo(() => {
       price: passPrices[formData.passType],
     });
 
+    // Add to wallet
+    addTicketToWallet(pass);
     setPurchasedTicket(pass);
   };
 
@@ -156,6 +159,8 @@ const Home = memo(() => {
     };
 
     const ticket = generateAnonymousTicket(ticketData);
+    // Add to wallet
+    addTicketToWallet(ticket);
     setPurchasedTicket(ticket);
   };
 
@@ -188,6 +193,16 @@ const Home = memo(() => {
               </div>
             </div>
             <div className="flex items-center gap-3">
+              <button
+                onClick={() => navigate('/wallet')}
+                className="flex items-center gap-2 px-3 py-2 text-white transition-colors font-bold text-xs uppercase"
+                style={{ backgroundColor: 'rgba(255,255,255,0.2)' }}
+                onMouseEnter={(e) => e.target.style.backgroundColor = 'rgba(255,255,255,0.3)'}
+                onMouseLeave={(e) => e.target.style.backgroundColor = 'rgba(255,255,255,0.2)'}
+              >
+                <FiCreditCard size={16} />
+                Wallet
+              </button>
               <button
                 onClick={() => navigate('/verify')}
                 className="flex items-center gap-2 px-3 py-2 text-white transition-colors font-bold text-xs uppercase"
