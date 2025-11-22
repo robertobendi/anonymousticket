@@ -135,8 +135,9 @@ const Home = memo(() => {
 
       // Sign payload with private key
       console.log('✍️ Signing payload...');
-      const signature = await signPayload(privateKey, payload);
-      console.log('✅ Payload signed. Signature:', signature.substring(0, 16) + '...');
+      const signature = signPayload(privateKey, payload);
+      console.log('✅ Payload signed. Signature length:', signature.length, 'hex chars');
+      console.log('✅ Full signature:', signature);
 
       // Submit MINT transaction to blockchain
       console.log('📤 Submitting MINT transaction to blockchain...');
@@ -223,8 +224,9 @@ const Home = memo(() => {
 
       // Sign payload with private key
       console.log('✍️ Signing payload...');
-      const signature = await signPayload(privateKey, payload);
-      console.log('✅ Payload signed. Signature:', signature.substring(0, 16) + '...');
+      const signature = signPayload(privateKey, payload);
+      console.log('✅ Payload signed. Signature length:', signature.length, 'hex chars');
+      console.log('✅ Full signature:', signature);
 
       // Submit MINT transaction to blockchain
       console.log('📤 Submitting MINT transaction to blockchain...');
