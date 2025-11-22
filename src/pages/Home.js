@@ -1,8 +1,8 @@
 import { useState, memo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { FiMapPin, FiCalendar, FiUsers, FiSearch, FiRepeat, FiAlertCircle, FiPrinter, FiShield, FiCreditCard, FiGlobe, FiRadio, FiMenu, FiArrowRight } from 'react-icons/fi';
-import { MdTrain } from 'react-icons/md';
+import { FiMapPin, FiCalendar, FiUsers, FiSearch, FiRepeat, FiAlertCircle, FiPrinter, FiShield, FiCreditCard, FiGlobe, FiRadio, FiMenu, FiArrowRight, FiClock, FiArrowLeft } from 'react-icons/fi';
+import { MdTrain, MdAccessTime, MdSwapHoriz } from 'react-icons/md';
 import { getConnections, transformConnection, getPopularStations, searchStations } from '@lib/api';
 import { generateAnonymousTicket, generateAnonymousPass, formatTicketForPrint, generateQRCodeData } from '@lib/ticketGenerator';
 import { addTicketToWallet } from '@lib/wallet';
@@ -421,7 +421,9 @@ const Home = memo(() => {
           backgroundColor: THEME.card, 
           borderRadius: '8px',
           border: `1px solid ${THEME.border}`,
-          boxShadow: '0 4px 12px rgba(0, 0, 0, 0.3)'
+          boxShadow: '0 4px 12px rgba(0, 0, 0, 0.5)',
+          position: 'relative',
+          zIndex: 10
         }}>
           <form onSubmit={handleSearch} className="space-y-4 sm:space-y-6" style={{ backgroundColor: 'transparent' }}>
             {/* Ticket Type Selector - SBB Style */}
@@ -574,12 +576,13 @@ const Home = memo(() => {
                   {showOriginSuggestions && originSuggestions.length > 0 && (
                     <div 
                       id="origin-suggestions"
-                      className="absolute z-10 w-full mt-2 border-2 max-h-48 overflow-y-auto rounded-lg shadow-lg" 
+                      className="absolute z-50 w-full mt-2 border-2 max-h-48 overflow-y-auto rounded-lg shadow-lg" 
                       style={{ 
                         borderColor: THEME.border, 
                         backgroundColor: THEME.card, 
                         borderRadius: '8px',
-                        boxShadow: '0 4px 12px rgba(0, 0, 0, 0.5)'
+                        boxShadow: '0 4px 12px rgba(0, 0, 0, 0.8)',
+                        border: `2px solid ${THEME.border}`
                       }}
                       role="listbox"
                       aria-label="Origin station suggestions"
@@ -669,12 +672,13 @@ const Home = memo(() => {
                   {showDestinationSuggestions && destinationSuggestions.length > 0 && (
                     <div 
                       id="destination-suggestions"
-                      className="absolute z-10 w-full mt-2 border-2 max-h-48 overflow-y-auto rounded-lg shadow-lg" 
+                      className="absolute z-50 w-full mt-2 border-2 max-h-48 overflow-y-auto rounded-lg shadow-lg" 
                       style={{ 
                         borderColor: THEME.border, 
                         backgroundColor: THEME.card, 
                         borderRadius: '8px',
-                        boxShadow: '0 4px 12px rgba(0, 0, 0, 0.5)'
+                        boxShadow: '0 4px 12px rgba(0, 0, 0, 0.8)',
+                        border: `2px solid ${THEME.border}`
                       }}
                       role="listbox"
                       aria-label="Destination station suggestions"
@@ -918,7 +922,7 @@ const Home = memo(() => {
           </form>
         </AnimatedCard>
         
-        {/* Search Results - SBB Style with Improved Spacing */}
+        {/* Search Results - EXACTLY matching form style */}
         <AnimatePresence>
           {searchResults && (
             <motion.div
@@ -926,6 +930,7 @@ const Home = memo(() => {
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -20 }}
               className="mt-6"
+              style={{ position: 'relative', zIndex: 10 }}
             >
               <div className="mb-6">
                 <h2 className="text-xl font-bold mb-2 uppercase tracking-wide" style={{ color: THEME.text }}>
@@ -940,38 +945,53 @@ const Home = memo(() => {
                   <AnimatedCard
                     key={trip.id}
                     delay={index * 0.05}
-                    className="rounded-lg border-2"
+                    className="p-4 sm:p-6 mb-4 sm:mb-6 rounded-lg"
                     style={{ 
-                      borderColor: THEME.border,
                       backgroundColor: THEME.card, 
                       borderRadius: '8px',
-                      boxShadow: '0 2px 8px rgba(0, 0, 0, 0.2)'
+                      border: `1px solid ${THEME.border}`,
+                      boxShadow: '0 4px 12px rgba(0, 0, 0, 0.5)',
+                      position: 'relative',
+                      zIndex: 10
                     }}
                     whileHover={{ 
                       backgroundColor: THEME.surfaceHover,
-                      borderColor: THEME.accent,
                       scale: 1.01
                     }}
                   >
-                    <div className="p-5 sm:p-6">
-                      {/* Time and Route Info - Improved Layout */}
-                      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-5 pb-5 border-b" style={{ borderColor: THEME.border }}>
+                      {/* Time and Route Info - SBB Style with Icons */}
+                      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-5 pb-5" style={{ borderBottom: `1px solid ${THEME.border}` }}>
                         <div className="flex items-center gap-4 sm:gap-6">
                           <div className="text-center sm:text-left">
-                            <div className="text-3xl sm:text-4xl font-bold mb-1" style={{ color: THEME.text }}>{trip.departure}</div>
-                            <div className="text-xs uppercase tracking-wide" style={{ color: THEME.textMuted }}>{formData.origin}</div>
+                            <div className="flex items-center gap-2 mb-1">
+                              <MdAccessTime size={20} style={{ color: THEME.accent }} aria-hidden="true" />
+                              <div className="text-3xl sm:text-4xl font-bold" style={{ color: THEME.text }}>{trip.departure}</div>
+                            </div>
+                            <div className="flex items-center gap-1.5 text-xs uppercase tracking-wide" style={{ color: THEME.textMuted }}>
+                              <FiMapPin size={12} aria-hidden="true" />
+                              <span>{formData.origin}</span>
+                            </div>
                           </div>
                           <div className="flex-shrink-0">
-                            <div className="text-2xl font-bold" style={{ color: THEME.accent }}>→</div>
+                            <MdSwapHoriz size={28} style={{ color: THEME.accent }} aria-hidden="true" />
                           </div>
                           <div className="text-center sm:text-left">
-                            <div className="text-3xl sm:text-4xl font-bold mb-1" style={{ color: THEME.text }}>{trip.arrival}</div>
-                            <div className="text-xs uppercase tracking-wide" style={{ color: THEME.textMuted }}>{formData.destination}</div>
+                            <div className="flex items-center gap-2 mb-1">
+                              <MdAccessTime size={20} style={{ color: THEME.accent }} aria-hidden="true" />
+                              <div className="text-3xl sm:text-4xl font-bold" style={{ color: THEME.text }}>{trip.arrival}</div>
+                            </div>
+                            <div className="flex items-center gap-1.5 text-xs uppercase tracking-wide" style={{ color: THEME.textMuted }}>
+                              <FiMapPin size={12} aria-hidden="true" />
+                              <span>{formData.destination}</span>
+                            </div>
                           </div>
                         </div>
                         <div className="text-center sm:text-right sm:min-w-[120px]">
-                          <div className="text-lg sm:text-xl font-bold mb-1" style={{ color: THEME.accent }}>
-                            {trip.price ? `CHF ${trip.price.toFixed(2)}` : 'Price on sbb.ch'}
+                          <div className="flex items-center justify-center sm:justify-end gap-2 mb-1">
+                            <FiCreditCard size={18} style={{ color: THEME.accent }} aria-hidden="true" />
+                            <div className="text-lg sm:text-xl font-bold" style={{ color: THEME.accent }}>
+                              {trip.price ? `CHF ${trip.price.toFixed(2)}` : 'Price on sbb.ch'}
+                            </div>
                           </div>
                           {trip.price && formData.passengers > 1 && (
                             <div className="text-xs" style={{ color: THEME.textMuted }}>
@@ -981,29 +1001,36 @@ const Home = memo(() => {
                         </div>
                       </div>
                       
-                      {/* Train Info - Better Spacing */}
+                      {/* Train Info - SBB Style with Icons */}
                       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                         <div className="flex flex-wrap items-center gap-3 sm:gap-4 text-sm">
                           <div className="flex items-center gap-2">
+                            <MdTrain size={18} style={{ color: THEME.accent }} aria-hidden="true" />
                             <span className="font-bold uppercase tracking-wide" style={{ color: THEME.accent }}>{trip.train}</span>
                           </div>
                           <div className="w-px h-4" style={{ backgroundColor: THEME.border }}></div>
-                          <span style={{ color: THEME.textMuted }}>{trip.duration}</span>
+                          <div className="flex items-center gap-1.5">
+                            <FiClock size={14} style={{ color: THEME.textMuted }} aria-hidden="true" />
+                            <span style={{ color: THEME.textMuted }}>{trip.duration}</span>
+                          </div>
                           <div className="w-px h-4" style={{ backgroundColor: THEME.border }}></div>
-                          <span style={{ color: THEME.textMuted }}>
-                            {trip.changes === 0 ? 'Direct' : `${trip.changes} change${trip.changes > 1 ? 's' : ''}`}
-                          </span>
+                          <div className="flex items-center gap-1.5">
+                            <FiArrowRight size={14} style={{ color: THEME.textMuted }} aria-hidden="true" />
+                            <span style={{ color: THEME.textMuted }}>
+                              {trip.changes === 0 ? 'Direct' : `${trip.changes} change${trip.changes > 1 ? 's' : ''}`}
+                            </span>
+                          </div>
                         </div>
                         <AnimatedButton
                           onClick={() => handleBook(trip)}
                           variant="primary"
-                          className="px-6 py-3 text-sm font-bold uppercase tracking-wide rounded-lg min-h-[48px]"
+                          className="px-6 py-3 text-sm font-bold uppercase tracking-wide rounded-lg min-h-[48px] flex items-center gap-2"
                           aria-label={`Book trip from ${formData.origin} to ${formData.destination} departing at ${trip.departure}`}
                         >
-                          Book Now
+                          <FiCreditCard size={16} aria-hidden="true" />
+                          <span>Book Now</span>
                         </AnimatedButton>
                       </div>
-                    </div>
                   </AnimatedCard>
                 ))}
               </div>

@@ -10,6 +10,7 @@ const AnimatedCard = memo(({
   className = '', 
   delay = 0,
   onClick,
+  style = {},
   whileHover = { scale: 1.01 }, // Subtle hover - SBB Reduced principle
   whileTap = { scale: 0.99 }
 }) => {
@@ -28,7 +29,8 @@ const AnimatedCard = memo(({
       className={className}
       style={{ 
         cursor: onClick ? 'pointer' : 'default',
-        borderRadius: '8px' // SBB rounded corners
+        borderRadius: '8px', // SBB rounded corners
+        ...style // Merge passed style props
       }}
       role={onClick ? 'button' : undefined}
       tabIndex={onClick ? 0 : undefined}
