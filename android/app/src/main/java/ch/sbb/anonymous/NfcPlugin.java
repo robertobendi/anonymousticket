@@ -37,8 +37,15 @@ public class NfcPlugin extends Plugin {
 
     @Override
     public void load() {
+        android.util.Log.d("NfcPlugin", "NfcPlugin.load() called - Plugin is loading");
         Activity activity = getActivity();
         nfcAdapter = NfcAdapter.getDefaultAdapter(activity.getApplicationContext());
+        
+        if (nfcAdapter == null) {
+            android.util.Log.e("NfcPlugin", "NFC adapter is null - NFC not available on this device");
+        } else {
+            android.util.Log.d("NfcPlugin", "NFC adapter found, enabled: " + nfcAdapter.isEnabled());
+        }
         
         // Create PendingIntent for NFC
         Intent intent = new Intent(activity, activity.getClass());
@@ -55,10 +62,13 @@ public class NfcPlugin extends Plugin {
         }
         intentFiltersArray = new IntentFilter[]{ndef};
         techListsArray = new String[][]{new String[]{Ndef.class.getName()}};
+        
+        android.util.Log.d("NfcPlugin", "NfcPlugin.load() completed successfully");
     }
 
     @PluginMethod
     public void isEnabled(PluginCall call) {
+        android.util.Log.d("NfcPlugin", "isEnabled() called from JavaScript");
         Activity activity = getActivity();
         JSObject ret = new JSObject();
         
@@ -69,10 +79,14 @@ public class NfcPlugin extends Plugin {
                         == PackageManager.PERMISSION_GRANTED;
             }
             
-            ret.put("enabled", nfcAdapter.isEnabled());
+            boolean nfcEnabled = nfcAdapter.isEnabled();
+            android.util.Log.d("NfcPlugin", "NFC status - enabled: " + nfcEnabled + ", hasPermission: " + hasPermission);
+            
+            ret.put("enabled", nfcEnabled);
             ret.put("available", true);
             ret.put("hasPermission", hasPermission);
         } else {
+            android.util.Log.w("NfcPlugin", "NFC adapter is null");
             ret.put("enabled", false);
             ret.put("available", false);
             ret.put("hasPermission", false);

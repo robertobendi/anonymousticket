@@ -3,31 +3,92 @@
  * Uses native Android NFC via Capacitor plugin or Web NFC API (Chrome browser)
  */
 
+import { Capacitor } from '@capacitor/core';
+
 // Import Capacitor NFC plugin (our custom native plugin)
 let Nfc = null;
 
 // Check for Capacitor and NFC plugin
 function checkNfcPlugin() {
-  if (window.Capacitor) {
-    // Wait a bit for plugins to load
-    if (window.Capacitor.Plugins) {
-      Nfc = window.Capacitor.Plugins.Nfc || window.Capacitor.Plugins['Nfc'];
+  try {
+    // Use Capacitor core API
+    if (Capacitor.isNativePlatform()) {
+      // Method 1: Try Capacitor.getPlugin (recommended in Capacitor 7+)
+      try {
+        if (typeof Capacitor.getPlugin === 'function') {
+          Nfc = Capacitor.getPlugin('Nfc');
+          if (Nfc) {
+            console.log('✓ NFC plugin found via Capacitor.getPlugin("Nfc")');
+            return true;
+          }
+        }
+      } catch (e) {
+        // Plugin might not be registered yet
+      }
+      
+      // Method 2: Try window.Capacitor.getPlugin
+      if (!Nfc && window.Capacitor?.getPlugin) {
+        try {
+          Nfc = window.Capacitor.getPlugin('Nfc');
+          if (Nfc) {
+            console.log('✓ NFC plugin found via window.Capacitor.getPlugin("Nfc")');
+            return true;
+          }
+        } catch (e) {
+          // Continue to next method
+        }
+      }
+      
+      // Method 3: Try Plugins object
+      if (!Nfc && window.Capacitor?.Plugins) {
+        Nfc = window.Capacitor.Plugins.Nfc || 
+              window.Capacitor.Plugins['Nfc'] ||
+              window.Capacitor.Plugins.NFC ||
+              window.Capacitor.Plugins['NFC'];
+        
+        if (Nfc) {
+          console.log('✓ NFC plugin found via Plugins object');
+          return true;
+        }
+      }
+      
+      // Debug: Log what's available
+      console.log('NFC Plugin Check:', {
+        hasCapacitor: !!window.Capacitor,
+        hasCore: !!Capacitor,
+        isNative: Capacitor.isNativePlatform(),
+        hasGetPlugin: typeof Capacitor.getPlugin === 'function',
+        hasPlugins: !!window.Capacitor?.Plugins,
+        pluginKeys: window.Capacitor?.Plugins ? Object.keys(window.Capacitor.Plugins) : []
+      });
+      
+      return true; // Return true if native platform
     }
-    // Also check if we're in a native app (not browser)
-    return window.Capacitor.isNativePlatform();
+  } catch (error) {
+    console.warn('Error checking NFC plugin:', error);
   }
   return false;
 }
 
-// Initialize on load
+// Initialize on load with multiple attempts
 if (typeof window !== 'undefined') {
   // Check immediately
   checkNfcPlugin();
   
-  // Also check after a short delay (plugins might load async)
+  // Check after delays (plugins load asynchronously)
   setTimeout(() => {
     checkNfcPlugin();
+    // Log what we found
+    if (window.Capacitor && window.Capacitor.isNativePlatform()) {
+      console.log('Capacitor plugins available:', window.Capacitor.Plugins ? Object.keys(window.Capacitor.Plugins) : 'none');
+      console.log('NFC plugin found:', !!Nfc);
+      if (Nfc) {
+        console.log('NFC plugin methods:', Object.keys(Nfc));
+      }
+    }
   }, 100);
+  setTimeout(() => checkNfcPlugin(), 500);
+  setTimeout(() => checkNfcPlugin(), 1000);
 }
 
 /**
@@ -39,16 +100,30 @@ export async function requestNFCPermission() {
   checkNfcPlugin();
   
   // If we're in a Capacitor native app, use the plugin
-  if (Nfc && window.Capacitor && window.Capacitor.isNativePlatform()) {
-    try {
-      const result = await Nfc.requestPermission();
-      console.log('NFC permission check:', result);
-      // NFC is a normal permission, so it's usually auto-granted
-      // Return the full result object
-      return result || { granted: false, message: 'Permission check failed' };
-    } catch (error) {
-      console.warn('Failed to request NFC permission via plugin:', error);
-      return { granted: false, message: error.message || 'Permission check failed' };
+  if (Capacitor.isNativePlatform()) {
+    // Make sure we have the plugin
+    if (!Nfc) {
+      checkNfcPlugin();
+      if (!Nfc && typeof Capacitor.getPlugin === 'function') {
+        try {
+          Nfc = Capacitor.getPlugin('Nfc');
+        } catch (e) {
+          // Continue
+        }
+      }
+    }
+    
+    if (Nfc) {
+      try {
+        const result = await Nfc.requestPermission();
+        console.log('NFC permission check:', result);
+        return result || { granted: false, message: 'Permission check failed' };
+      } catch (error) {
+        console.warn('Failed to request NFC permission via plugin:', error);
+        return { granted: false, message: error.message || 'Permission check failed' };
+      }
+    } else {
+      console.warn('NFC plugin not found for permission request');
     }
   }
   
@@ -84,7 +159,7 @@ export async function requestNFCPermission() {
 }
 
 /**
- * Check if NFC is available
+ * Check if NFC is available (synchronous check)
  * @returns {boolean} True if NFC is supported
  */
 export function isNFCAvailable() {
@@ -92,9 +167,9 @@ export function isNFCAvailable() {
   checkNfcPlugin();
   
   // If we're in a Capacitor native app, NFC should be available via native plugin
-  if (window.Capacitor && window.Capacitor.isNativePlatform()) {
-    // In native app, always return true - the plugin will handle it
-    // Even if plugin isn't loaded yet, it will be when we try to use it
+  if (Capacitor.isNativePlatform()) {
+    // In native app, assume NFC is available - the plugin will handle errors
+    // The plugin is registered in capacitor.config.json, so it should be available
     return true;
   }
   
@@ -110,6 +185,89 @@ export function isNFCAvailable() {
       return true;
     }
   }
+  
+  return false;
+}
+
+/**
+ * Check if NFC is available (async - actually tests the plugin)
+ * @returns {Promise<boolean>} True if NFC is supported and working
+ */
+export async function isNFCAvailableAsync() {
+  // Re-check plugin availability
+  checkNfcPlugin();
+  
+  // If we're in a Capacitor native app, try to actually call the plugin
+  if (Capacitor.isNativePlatform()) {
+    // Try to get the plugin using all methods
+    if (!Nfc) {
+      // Method 1: getPlugin (recommended)
+      if (window.Capacitor.getPlugin) {
+        try {
+          Nfc = window.Capacitor.getPlugin('Nfc');
+          console.log('NFC plugin found via getPlugin');
+        } catch (e) {
+          console.log('getPlugin("Nfc") error:', e.message);
+        }
+      }
+      
+      // Method 2: Plugins object
+      if (!Nfc && window.Capacitor.Plugins) {
+        Nfc = window.Capacitor.Plugins.Nfc || window.Capacitor.Plugins['Nfc'];
+        if (Nfc) {
+          console.log('NFC plugin found via Plugins object');
+        }
+      }
+      
+      // Method 3: Try accessing directly
+      if (!Nfc && window.Capacitor.Plugins) {
+        const plugins = window.Capacitor.Plugins;
+        for (const key in plugins) {
+          if (key.toLowerCase() === 'nfc') {
+            Nfc = plugins[key];
+            console.log('NFC plugin found via iteration, key:', key);
+            break;
+          }
+        }
+      }
+    }
+    
+    // If we have the plugin, try to call isEnabled to verify it works
+    if (Nfc) {
+      try {
+        if (typeof Nfc.isEnabled === 'function') {
+          const result = await Nfc.isEnabled();
+          console.log('NFC isEnabled result:', result);
+          return result?.available !== false;
+        } else {
+          console.warn('NFC plugin found but isEnabled is not a function');
+          return true; // Plugin exists, assume available
+        }
+      } catch (error) {
+        console.error('NFC plugin check failed:', error);
+        // Plugin exists but call failed - might still work
+        return true;
+      }
+    } else {
+      console.error('NFC plugin not found. Capacitor info:', {
+        hasCapacitor: !!window.Capacitor,
+        isNative: window.Capacitor?.isNativePlatform(),
+        hasPlugins: !!window.Capacitor?.Plugins,
+        pluginKeys: window.Capacitor?.Plugins ? Object.keys(window.Capacitor.Plugins) : [],
+        hasGetPlugin: typeof window.Capacitor?.getPlugin === 'function'
+      });
+    }
+    
+    // Even if plugin not found, we're in native app, so assume it might be available
+    // (plugin might load later)
+    return true;
+  }
+  
+  // Check for Web NFC API
+  if ('NDEFReader' in window && !window.Capacitor && window.isSecureContext) {
+    return true;
+  }
+  
   return false;
 }
 
@@ -220,13 +378,42 @@ export async function readNFCCapacitor() {
   // Re-check plugin availability
   checkNfcPlugin();
   
-  // Try to get plugin if not already loaded
-  if (!Nfc && window.Capacitor && window.Capacitor.Plugins) {
-    Nfc = window.Capacitor.Plugins.Nfc || window.Capacitor.Plugins['Nfc'];
+  // Try to get plugin using all methods
+  if (!Nfc) {
+    // Method 1: Capacitor core API
+    if (typeof Capacitor.getPlugin === 'function') {
+      try {
+        Nfc = Capacitor.getPlugin('Nfc');
+      } catch (e) {
+        // Continue
+      }
+    }
+    
+    // Method 2: window.Capacitor.getPlugin
+    if (!Nfc && window.Capacitor?.getPlugin) {
+      try {
+        Nfc = window.Capacitor.getPlugin('Nfc');
+      } catch (e) {
+        // Continue
+      }
+    }
+    
+    // Method 3: Plugins object
+    if (!Nfc && window.Capacitor?.Plugins) {
+      Nfc = window.Capacitor.Plugins.Nfc || window.Capacitor.Plugins['Nfc'];
+    }
   }
   
   if (!Nfc) {
-    throw new Error('Native NFC plugin not available. Please ensure NFC is enabled on your device.');
+    // Wait and retry once
+    await new Promise(resolve => setTimeout(resolve, 300));
+    checkNfcPlugin();
+    
+    if (!Nfc) {
+      const availablePlugins = window.Capacitor?.Plugins ? Object.keys(window.Capacitor.Plugins) : [];
+      console.error('NFC plugin not found after retry. Available plugins:', availablePlugins);
+      throw new Error(`Native NFC plugin not available. Found plugins: ${availablePlugins.join(', ') || 'none'}`);
+    }
   }
 
   try {
@@ -377,14 +564,45 @@ export async function writeNFCWeb(data) {
  * @returns {Promise<void>}
  */
 export async function writeNFCCapacitor(data) {
+  // Re-check plugin availability
   checkNfcPlugin();
   
-  if (!Nfc && window.Capacitor && window.Capacitor.Plugins) {
-    Nfc = window.Capacitor.Plugins.Nfc || window.Capacitor.Plugins['Nfc'];
+  // Try to get plugin using all methods
+  if (!Nfc) {
+    // Method 1: Capacitor core API
+    if (typeof Capacitor.getPlugin === 'function') {
+      try {
+        Nfc = Capacitor.getPlugin('Nfc');
+      } catch (e) {
+        // Continue
+      }
+    }
+    
+    // Method 2: window.Capacitor.getPlugin
+    if (!Nfc && window.Capacitor?.getPlugin) {
+      try {
+        Nfc = window.Capacitor.getPlugin('Nfc');
+      } catch (e) {
+        // Continue
+      }
+    }
+    
+    // Method 3: Plugins object
+    if (!Nfc && window.Capacitor?.Plugins) {
+      Nfc = window.Capacitor.Plugins.Nfc || window.Capacitor.Plugins['Nfc'];
+    }
   }
   
   if (!Nfc) {
-    throw new Error('Native NFC plugin not available. Please ensure NFC is enabled on your device.');
+    // Wait and retry once
+    await new Promise(resolve => setTimeout(resolve, 300));
+    checkNfcPlugin();
+    
+    if (!Nfc) {
+      const availablePlugins = window.Capacitor?.Plugins ? Object.keys(window.Capacitor.Plugins) : [];
+      console.error('NFC plugin not found for write. Available plugins:', availablePlugins);
+      throw new Error(`Native NFC plugin not available. Found plugins: ${availablePlugins.join(', ') || 'none'}`);
+    }
   }
 
   try {

@@ -17,7 +17,14 @@ const Wallet = memo(() => {
   const [nfcAvailable, setNfcAvailable] = useState(false);
 
   useEffect(() => {
-    setNfcAvailable(isNFCAvailable());
+    // Check NFC availability asynchronously to get accurate status
+    const checkNFC = async () => {
+      const { isNFCAvailableAsync } = await import('@lib/nfc');
+      const available = await isNFCAvailableAsync();
+      setNfcAvailable(available);
+      console.log('NFC availability check:', available);
+    };
+    checkNFC();
   }, []);
 
   const handleSendWallet = async () => {
