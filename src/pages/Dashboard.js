@@ -2,6 +2,7 @@ import { useState, useEffect, memo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { FiBarChart2, FiTrendingUp, FiCheckCircle, FiRefreshCw, FiArrowLeft, FiCalendar, FiMapPin, FiX } from 'react-icons/fi';
 import { THEME } from '@lib/themeColors';
+import SwitzerlandMap from '@components/SwitzerlandMap';
 
 // Swiss cantons list
 const SWISS_CANTONS = [
@@ -42,6 +43,7 @@ const Dashboard = memo(() => {
   const [isLoading, setIsLoading] = useState(true);
   const [selectedCantons, setSelectedCantons] = useState([]);
   const [showCantonSelector, setShowCantonSelector] = useState(false);
+  const [showMap, setShowMap] = useState(false);
   const [stats, setStats] = useState({
     issuedToday: 0,
     activated: 0,
@@ -257,6 +259,54 @@ const Dashboard = memo(() => {
               <h2 className="text-lg font-bold" style={{ color: THEME.text }}>
                 Statistics by Canton
               </h2>
+            </div>
+          </div>
+
+          {/* Interactive Map - Dropdown */}
+          <div className="mb-6">
+            <button
+              onClick={() => setShowMap(!showMap)}
+              className="w-full px-4 py-3 text-left border-2 transition-colors flex items-center justify-between"
+              style={{ 
+                borderColor: THEME.border,
+                backgroundColor: THEME.surface,
+                color: THEME.text
+              }}
+              onMouseEnter={(e) => {
+                e.target.style.borderColor = THEME.accent;
+                e.target.style.backgroundColor = THEME.surfaceHover;
+              }}
+              onMouseLeave={(e) => {
+                e.target.style.borderColor = THEME.border;
+                e.target.style.backgroundColor = THEME.surface;
+              }}
+            >
+              <div className="flex items-center gap-2">
+                <FiMapPin size={18} style={{ color: THEME.accent }} />
+                <span className="text-sm font-bold">
+                  {showMap ? 'Hide Interactive Map' : 'Show Interactive Map'}
+                </span>
+              </div>
+              <span className="text-xs" style={{ color: THEME.textMuted }}>
+                {showMap ? '▲' : '▼'}
+              </span>
+            </button>
+
+            {showMap && (
+              <div className="mt-4">
+                <SwitzerlandMap
+                  selectedCantons={selectedCantons}
+                  onCantonClick={toggleCanton}
+                />
+              </div>
+            )}
+          </div>
+
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-3">
+              <h3 className="text-base font-bold" style={{ color: THEME.text }}>
+                Or use the dropdown selector:
+              </h3>
             </div>
             <div className="flex gap-2">
               {selectedCantons.length > 0 && (
