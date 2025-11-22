@@ -1,11 +1,12 @@
 import { useState, useEffect, memo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { FiBarChart2, FiTrendingUp, FiCheckCircle, FiRefreshCw, FiArrowLeft, FiCalendar, FiMapPin, FiX } from 'react-icons/fi';
+import { FiBarChart2, FiTrendingUp, FiCheckCircle, FiRefreshCw, FiArrowLeft, FiCalendar, FiMapPin, FiX, FiMenu } from 'react-icons/fi';
 import { THEME } from '@lib/themeColors';
 import SwitzerlandMap from '@components/SwitzerlandMap';
 import AnimatedCard from '@components/ui/AnimatedCard';
 import AnimatedButton from '@components/ui/AnimatedButton';
+import MobileSidebar from '@components/ui/MobileSidebar';
 
 // Swiss cantons list
 const SWISS_CANTONS = [
@@ -43,6 +44,7 @@ const SWISS_CANTONS = [
  */
 const Dashboard = memo(() => {
   const navigate = useNavigate();
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [selectedCantons, setSelectedCantons] = useState([]);
   const [showCantonSelector, setShowCantonSelector] = useState(false);
@@ -137,15 +139,16 @@ const Dashboard = memo(() => {
   const StatCard = ({ icon: Icon, label, value, color = THEME.accent, delay = 0 }) => (
     <AnimatedCard
       delay={delay}
-      className="p-4 sm:p-6 border-2"
+      className="p-4 sm:p-6 border-2 rounded-lg"
       style={{ 
         backgroundColor: THEME.card, 
         borderColor: THEME.border,
+        borderRadius: '8px'
       }}
       whileHover={{ 
         borderColor: color,
         backgroundColor: THEME.surfaceHover,
-        scale: 1.02
+        scale: 1.01 // Reduced scale - SBB Reduced principle
       }}
     >
       <div className="flex items-center justify-between mb-4">
@@ -209,16 +212,27 @@ const Dashboard = memo(() => {
                 </div>
               </div>
             </div>
-            <AnimatedButton
-              onClick={handleRefresh}
-              disabled={isLoading}
-              loading={isLoading}
-              variant="secondary"
-              className="px-3 py-2 text-xs uppercase min-h-[44px]"
-              icon={FiRefreshCw}
-            >
-              Refresh
-            </AnimatedButton>
+            <div className="flex items-center gap-2">
+              <AnimatedButton
+                onClick={handleRefresh}
+                disabled={isLoading}
+                loading={isLoading}
+                variant="secondary"
+                className="px-3 py-2 text-xs uppercase min-h-[44px] hidden sm:flex"
+                icon={FiRefreshCw}
+              >
+                Refresh
+              </AnimatedButton>
+              <motion.button
+                onClick={() => setSidebarOpen(true)}
+                className="md:hidden p-2 min-w-[44px] min-h-[44px] flex items-center justify-center text-white"
+                whileHover={{ scale: 1.1, rotate: 90 }}
+                whileTap={{ scale: 0.9 }}
+                aria-label="Open menu"
+              >
+                <FiMenu size={24} />
+              </motion.button>
+            </div>
           </div>
         </div>
       </motion.section>
@@ -226,7 +240,7 @@ const Dashboard = memo(() => {
       {/* Dashboard Content */}
       <section className="max-w-6xl mx-auto px-4 sm:px-6 py-4 sm:py-6">
         {/* Date Info */}
-        <AnimatedCard className="mb-4 sm:mb-6 p-4 sm:p-6 flex items-center gap-3" style={{ backgroundColor: THEME.card, border: `2px solid ${THEME.border}` }}>
+        <AnimatedCard className="mb-4 sm:mb-6 p-4 sm:p-6 flex items-center gap-3 rounded-lg" style={{ backgroundColor: THEME.card, border: `2px solid ${THEME.border}`, borderRadius: '8px' }}>
           <FiCalendar size={20} style={{ color: THEME.accent }} />
           <div>
             <div className="text-sm font-bold" style={{ color: THEME.textMuted }}>Today</div>
@@ -267,7 +281,7 @@ const Dashboard = memo(() => {
         </div>
 
         {/* Canton Selector Section */}
-        <AnimatedCard className="mb-4 sm:mb-6 p-4 sm:p-6" style={{ backgroundColor: THEME.card, border: `2px solid ${THEME.border}` }}>
+        <AnimatedCard className="mb-4 sm:mb-6 p-4 sm:p-6 rounded-lg" style={{ backgroundColor: THEME.card, border: `2px solid ${THEME.border}`, borderRadius: '8px' }}>
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-3">
               <FiMapPin size={20} style={{ color: THEME.accent }} />
@@ -281,17 +295,20 @@ const Dashboard = memo(() => {
           <div className="mb-4 sm:mb-6">
             <motion.button
               onClick={() => setShowMap(!showMap)}
-              className="w-full px-4 py-3 sm:py-4 text-left border-2 flex items-center justify-between min-h-[48px] text-base"
+              className="w-full px-4 py-3 sm:py-4 text-left border-2 flex items-center justify-between min-h-[48px] text-base rounded-lg"
               style={{ 
                 borderColor: THEME.border,
                 backgroundColor: THEME.surface,
-                color: THEME.text
+                color: THEME.text,
+                borderRadius: '8px'
               }}
               whileHover={{ 
                 borderColor: THEME.accent,
                 backgroundColor: THEME.surfaceHover
               }}
-              whileTap={{ scale: 0.98 }}
+              whileTap={{ scale: 0.99 }}
+              aria-label={showMap ? 'Hide interactive map' : 'Show interactive map'}
+              aria-expanded={showMap}
             >
               <div className="flex items-center gap-2">
                 <FiMapPin size={18} style={{ color: THEME.accent }} />
@@ -418,17 +435,20 @@ const Dashboard = memo(() => {
           <div className="relative">
             <motion.button
               onClick={() => setShowCantonSelector(!showCantonSelector)}
-              className="w-full px-4 py-3 sm:py-4 text-left border-2 flex items-center justify-between min-h-[48px] text-base"
+              className="w-full px-4 py-3 sm:py-4 text-left border-2 flex items-center justify-between min-h-[48px] text-base rounded-lg"
               style={{ 
                 borderColor: THEME.border,
                 backgroundColor: THEME.surface,
-                color: THEME.text
+                color: THEME.text,
+                borderRadius: '8px'
               }}
               whileHover={{ 
                 borderColor: THEME.accent,
                 backgroundColor: THEME.surfaceHover
               }}
-              whileTap={{ scale: 0.98 }}
+              whileTap={{ scale: 0.99 }}
+              aria-label="Select cantons"
+              aria-expanded={showCantonSelector}
             >
               <span className="text-sm font-bold">
                 {selectedCantons.length === 0 
@@ -446,11 +466,14 @@ const Dashboard = memo(() => {
                   initial={{ opacity: 0, y: -10 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: -10 }}
-                  className="absolute z-10 w-full mt-1 border-2 max-h-64 overflow-y-auto"
+                  className="absolute z-10 w-full mt-1 border-2 max-h-64 overflow-y-auto rounded-lg"
                   style={{ 
                     borderColor: THEME.border,
-                    backgroundColor: THEME.card
+                    backgroundColor: THEME.card,
+                    borderRadius: '8px'
                   }}
+                  role="listbox"
+                  aria-label="Canton selection"
                 >
                   {SWISS_CANTONS.map((canton, index) => {
                     const isSelected = selectedCantons.includes(canton.code);
@@ -511,12 +534,13 @@ const Dashboard = memo(() => {
                     <AnimatedCard
                       key={cantonCode}
                       delay={index * 0.1}
-                      className="p-4 sm:p-6 border-2"
+                      className="p-4 sm:p-6 border-2 rounded-lg"
                       style={{ 
                         backgroundColor: THEME.card,
-                        borderColor: THEME.border
+                        borderColor: THEME.border,
+                        borderRadius: '8px'
                       }}
-                      whileHover={{ scale: 1.02 }}
+                      whileHover={{ scale: 1.01 }}
                     >
                     <div className="flex items-center justify-between mb-3">
                       <h4 className="text-base font-bold" style={{ color: THEME.text }}>
@@ -559,7 +583,7 @@ const Dashboard = memo(() => {
         </AnimatePresence>
 
         {/* Info Box */}
-        <AnimatedCard className="p-4 sm:p-6" style={{ backgroundColor: THEME.card, border: `2px solid ${THEME.border}` }}>
+        <AnimatedCard className="p-4 sm:p-6 rounded-lg" style={{ backgroundColor: THEME.card, border: `2px solid ${THEME.border}`, borderRadius: '8px' }}>
           <div className="flex items-start gap-3">
             <div className="w-8 h-8 flex items-center justify-center flex-shrink-0" style={{ backgroundColor: `${THEME.accent}20` }}>
               <FiBarChart2 size={18} style={{ color: THEME.accent }} />
@@ -577,6 +601,9 @@ const Dashboard = memo(() => {
           </div>
         </AnimatedCard>
       </section>
+
+      {/* Mobile Sidebar */}
+      <MobileSidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
     </motion.div>
   );
 });

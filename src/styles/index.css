@@ -30,6 +30,52 @@
   
   input, select, textarea, button {
     font-family: inherit;
+    border-radius: 8px; /* SBB rounded corners */
+  }
+  
+  /* Ensure form containers are dark */
+  form {
+    background-color: transparent !important;
+  }
+  
+  /* SBB Form Input Styling - Dark Theme */
+  input[type="text"],
+  input[type="date"],
+  input[type="email"],
+  input[type="tel"],
+  input[type="number"] {
+    background-color: #1a1a1a;
+    color: #ffffff;
+    border: 2px solid #666666;
+    transition: border-color 0.2s ease, border-width 0.2s ease;
+  }
+  
+  input[type="text"]:focus,
+  input[type="date"]:focus,
+  input[type="email"]:focus,
+  input[type="tel"]:focus,
+  input[type="number"]:focus {
+    border-color: #EB0000;
+    border-width: 3px;
+    outline: none;
+    background-color: #2a2a2a;
+  }
+  
+  select {
+    background-color: #1a1a1a;
+    color: #ffffff;
+    border: 2px solid #666666;
+    transition: border-color 0.2s ease, border-width 0.2s ease;
+  }
+  
+  select:focus {
+    border-color: #EB0000;
+    border-width: 3px;
+    outline: none;
+    background-color: #2a2a2a;
+  }
+  
+  option {
     background-color: #1a1a1a;
     color: #ffffff;
   }
@@ -38,6 +84,7 @@
   input[type="checkbox"]:checked {
     background-color: #EB0000;
     border-color: #EB0000;
+    border-radius: 4px; /* Slightly rounded for checkboxes */
   }
   
   input[type="date"]::-webkit-calendar-picker-indicator {
@@ -47,12 +94,19 @@
   
   select:focus {
     border-color: #EB0000;
-    outline: none;
+    outline: 2px solid rgba(235, 0, 0, 0.3); /* SBB focus ring */
+    outline-offset: 2px;
   }
   
   input:focus {
     border-color: #EB0000;
-    outline: none;
+    outline: 2px solid rgba(235, 0, 0, 0.3); /* SBB focus ring */
+    outline-offset: 2px;
+  }
+  
+  button:focus-visible {
+    outline: 2px solid rgba(235, 0, 0, 0.3); /* SBB focus ring for accessibility */
+    outline-offset: 2px;
   }
   
   option {
@@ -109,28 +163,63 @@
     animation: slideUp 0.4s ease-out;
   }
   
-  /* Mobile-optimized touch targets */
+  @keyframes slide {
+    from {
+      transform: translateX(0);
+    }
+    to {
+      transform: translateX(20px);
+    }
+  }
+  
+  /* Mobile-optimized touch targets - SBB guidelines */
   @media (max-width: 768px) {
     button, a, input[type="button"], input[type="submit"] {
-      min-height: 48px; /* Enhanced touch target for better UX */
+      min-height: 48px; /* SBB minimum touch target */
       min-width: 44px;
-      padding: 12px 16px; /* Better padding for mobile */
+      padding: 12px 16px; /* SBB spacing */
+      border-radius: 8px; /* SBB rounded corners */
     }
     
-    /* Larger text on mobile for readability */
+    /* Larger text on mobile for readability - SBB accessibility */
     body {
-      font-size: 16px; /* Prevents zoom on iOS */
+      font-size: 16px; /* Prevents zoom on iOS, SBB body size */
+      line-height: 24px; /* SBB line height */
     }
     
-    /* Better spacing on mobile */
+    /* Better spacing on mobile - SBB spacing system */
     .space-y-4 > * + * {
-      margin-top: 1rem;
+      margin-top: 1rem; /* 16px - SBB spacing unit */
     }
     
-    /* Improved input fields */
-    input, select, textarea {
+    /* Improved input fields - SBB guidelines - Dark Theme */
+    input[type="text"],
+    input[type="date"],
+    input[type="email"],
+    input[type="tel"],
+    input[type="number"],
+    select,
+    textarea {
       font-size: 16px; /* Prevents zoom on iOS */
-      padding: 14px 16px;
+      padding: 12px 16px; /* SBB spacing */
+      border-radius: 8px; /* SBB rounded corners */
+      background-color: #1a1a1a;
+      color: #ffffff;
+    }
+  }
+  
+  /* Extra small screens - hide secondary text */
+  @media (max-width: 360px) {
+    .xs\:inline {
+      display: none;
+    }
+  }
+  
+  /* Navbar compact on mobile */
+  @media (max-width: 640px) {
+    nav {
+      padding-top: 8px;
+      padding-bottom: 8px;
     }
   }
   
@@ -146,15 +235,46 @@
     -webkit-overflow-scrolling: touch;
   }
   
-  /* Smooth scrolling */
+  /* Smooth scrolling - SBB Reduced principle (subtle) */
   html {
     scroll-behavior: smooth;
   }
   
-  /* Better mobile text rendering */
+  /* Better mobile text rendering - SBB Inclusive principle */
   body {
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     text-rendering: optimizeLegibility;
+  }
+  
+  /* Screen reader only - SBB Inclusive principle */
+  .sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border-width: 0;
+  }
+  
+  /* Focus visible for keyboard navigation - SBB Inclusive principle */
+  *:focus-visible {
+    outline: 2px solid rgba(235, 0, 0, 0.5);
+    outline-offset: 2px;
+    border-radius: 4px;
+  }
+  
+  /* Reduced animation for users who prefer reduced motion - SBB Inclusive principle */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+    }
   }
 } 

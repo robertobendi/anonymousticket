@@ -1,7 +1,7 @@
 {
-  "short_name": "SBB Tickets",
-  "name": "SBB Anonymous Tickets",
-  "description": "Anonymous public transport tickets - No personal data required",
+  "short_name": "NodePass",
+  "name": "NodePass - Anonymous Ticket System",
+  "description": "Anonymous ticket system - No personal data required",
   "icons": [
     {
       "src": "favicon.ico",

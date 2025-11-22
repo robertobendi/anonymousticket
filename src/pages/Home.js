@@ -1,18 +1,22 @@
 import { useState, memo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { FiMapPin, FiCalendar, FiUsers, FiSearch, FiRepeat, FiAlertCircle, FiPrinter, FiShield, FiCreditCard, FiGlobe, FiRadio } from 'react-icons/fi';
+import { FiMapPin, FiCalendar, FiUsers, FiSearch, FiRepeat, FiAlertCircle, FiPrinter, FiShield, FiCreditCard, FiGlobe, FiRadio, FiMenu, FiArrowRight } from 'react-icons/fi';
+import { MdTrain } from 'react-icons/md';
 import { getConnections, transformConnection, getPopularStations, searchStations } from '@lib/api';
 import { generateAnonymousTicket, generateAnonymousPass, formatTicketForPrint, generateQRCodeData } from '@lib/ticketGenerator';
 import { addTicketToWallet } from '@lib/wallet';
 import { THEME } from '@lib/themeColors';
 import AnimatedCard from '@components/ui/AnimatedCard';
 import AnimatedButton from '@components/ui/AnimatedButton';
+import MobileSidebar from '@components/ui/MobileSidebar';
+import HeroGlobe from '@components/ui/HeroGlobe';
 
 const SWISS_STATIONS = getPopularStations();
 
 const Home = memo(() => {
   const navigate = useNavigate();
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   
   const [formData, setFormData] = useState({
     ticketType: 'single', // 'single' or 'pass'
@@ -188,100 +192,287 @@ const Home = memo(() => {
       animate={{ opacity: 1 }}
       transition={{ duration: 0.3 }}
     >
-      {/* Hero Section - Anonymous Ticket Focus */}
+      {/* Hero Section - Beautiful Train Station Background */}
       <motion.section 
-        className="text-white py-6" 
-        style={{ backgroundColor: THEME.accent }}
-        initial={{ y: -20, opacity: 0 }}
-        animate={{ y: 0, opacity: 1 }}
-        transition={{ duration: 0.4 }}
+        className="text-white relative overflow-hidden" 
+        style={{ 
+          minHeight: '100vh',
+          paddingTop: 'calc(env(safe-area-inset-top) + 1rem)'
+        }}
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ duration: 0.6 }}
       >
-        <div className="max-w-6xl mx-auto px-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-white/20 flex items-center justify-center">
-                <span className="text-white font-bold text-sm">SBB</span>
+        {/* Train Station Background Image */}
+        <div 
+          className="absolute inset-0 bg-cover bg-center bg-no-repeat"
+          style={{
+            backgroundImage: 'url(/wp.jpg)',
+            backgroundPosition: 'center center'
+          }}
+        />
+        
+        {/* Elegant gradient overlay - SBB inspired */}
+        <div 
+          className="absolute inset-0"
+          style={{
+            background: 'linear-gradient(to bottom, rgba(235,0,0,0.85) 0%, rgba(235,0,0,0.75) 30%, rgba(0,0,0,0.4) 70%, rgba(0,0,0,0.6) 100%)'
+          }}
+        />
+        
+        {/* Red Navbar Overlay - SBB Style */}
+        <div className="relative z-20">
+          <div className="max-w-6xl mx-auto px-3 sm:px-4 py-3 sm:py-4">
+            <div className="flex items-center justify-between gap-2 sm:gap-3">
+              <div className="flex items-center gap-2 sm:gap-3 min-w-0 flex-1">
+                <img 
+                  src="/logo.png" 
+                  alt="NodePass" 
+                  className="h-8 w-auto sm:h-10 flex-shrink-0"
+                />
+                <div className="min-w-0 flex-1">
+                  <h1 className="text-lg sm:text-xl md:text-2xl font-bold tracking-tight truncate">NodePass</h1>
+                  <p className="text-xs sm:text-sm opacity-90 hidden sm:block">Anonymous ticket system</p>
+                </div>
               </div>
-              <div>
-                <h1 className="text-2xl font-bold tracking-tight">Anonymous Tickets</h1>
-                <p className="text-sm opacity-90">No personal data required • Print@Home</p>
-              </div>
-            </div>
-            <div className="flex items-center gap-3">
-              <motion.button
-                onClick={() => navigate('/wallet')}
-                className="flex items-center gap-2 px-3 py-2 text-white font-bold text-xs uppercase"
-                style={{ backgroundColor: 'rgba(255,255,255,0.2)' }}
-                whileHover={{ backgroundColor: 'rgba(255,255,255,0.3)' }}
-                whileTap={{ scale: 0.95 }}
-              >
-                <FiCreditCard size={16} />
-                Wallet
-              </motion.button>
-              <motion.button
-                onClick={() => navigate('/verify')}
-                className="flex items-center gap-2 px-3 py-2 text-white font-bold text-xs uppercase"
-                style={{ backgroundColor: 'rgba(255,255,255,0.2)' }}
-                whileHover={{ backgroundColor: 'rgba(255,255,255,0.3)' }}
-                whileTap={{ scale: 0.95 }}
-              >
-                <FiRadio size={16} />
-                Verify
-              </motion.button>
-              <div className="flex items-center gap-2 px-3 py-2" style={{ backgroundColor: 'rgba(255,255,255,0.2)' }}>
-                <FiShield size={18} />
-                <span className="text-xs font-bold">100% Anonymous</span>
+              <div className="flex items-center gap-1.5 sm:gap-2 md:gap-3 flex-shrink-0">
+                {/* Mobile Menu Button */}
+                <motion.button
+                  onClick={() => setSidebarOpen(true)}
+                  className="md:hidden p-2 min-w-[44px] min-h-[44px] flex items-center justify-center text-white"
+                  whileHover={{ scale: 1.1, rotate: 90 }}
+                  whileTap={{ scale: 0.9 }}
+                  aria-label="Open menu"
+                >
+                  <FiMenu size={24} />
+                </motion.button>
+                
+                {/* Desktop Buttons - SBB Style */}
+                <motion.button
+                  onClick={() => navigate('/wallet')}
+                  className="hidden md:flex items-center gap-2 px-4 py-2.5 text-white font-bold text-xs uppercase min-h-[44px] rounded-lg border-2 transition-all"
+                  style={{ 
+                    backgroundColor: 'rgba(255,255,255,0.15)',
+                    borderColor: 'rgba(255,255,255,0.3)',
+                    borderRadius: '8px'
+                  }}
+                  whileHover={{ 
+                    backgroundColor: 'rgba(255,255,255,0.2)',
+                    borderColor: '#ffffff'
+                  }}
+                  whileTap={{ scale: 0.95 }}
+                >
+                  <FiCreditCard size={16} />
+                  Wallet
+                </motion.button>
+                <motion.button
+                  onClick={() => navigate('/verify')}
+                  className="hidden md:flex items-center gap-2 px-4 py-2.5 text-white font-bold text-xs uppercase min-h-[44px] rounded-lg border-2 transition-all"
+                  style={{ 
+                    backgroundColor: 'rgba(255,255,255,0.15)',
+                    borderColor: 'rgba(255,255,255,0.3)',
+                    borderRadius: '8px'
+                  }}
+                  whileHover={{ 
+                    backgroundColor: 'rgba(255,255,255,0.2)',
+                    borderColor: '#ffffff'
+                  }}
+                  whileTap={{ scale: 0.95 }}
+                >
+                  <FiRadio size={16} />
+                  Verify
+                </motion.button>
+                <div className="hidden lg:flex items-center gap-2 px-4 py-2.5 rounded-lg border-2" style={{ 
+                  backgroundColor: 'rgba(255,255,255,0.15)',
+                  borderColor: 'rgba(255,255,255,0.3)',
+                  borderRadius: '8px'
+                }}>
+                  <FiShield size={18} />
+                  <span className="text-xs font-bold">100% Anonymous</span>
+                </div>
               </div>
             </div>
           </div>
         </div>
+        
+        {/* Hero Content - Centered and Beautiful */}
+        <div className="relative z-10 flex items-center justify-center min-h-[calc(100vh-120px)] pb-20">
+          <div className="max-w-4xl mx-auto px-3 sm:px-4 text-center">
+            <motion.div
+              initial={{ opacity: 0, y: 30 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.3, duration: 0.7, ease: "easeOut" }}
+            >
+              <h2 className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-bold mb-4 sm:mb-6 tracking-tight leading-tight">
+                Anonymous
+                <br />
+                <span className="text-white">Tickets</span>
+              </h2>
+              <motion.p 
+                className="text-lg sm:text-xl md:text-2xl opacity-95 max-w-2xl mx-auto mb-8 sm:mb-10 font-normal"
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.5, duration: 0.7 }}
+                role="text"
+                aria-label="Key features: No personal data required, Print at Home, Multiple checks, Copy-safe"
+              >
+                No personal data required • Print@Home • Multiple checks • Copy-safe
+              </motion.p>
+              <motion.div 
+                className="flex items-center justify-center gap-3 sm:gap-4 flex-wrap"
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.7, duration: 0.7 }}
+              >
+                <motion.button
+                  className="flex items-center gap-2.5 px-5 py-3.5 rounded-lg border-2 min-h-[48px] transition-all"
+                  style={{
+                    backgroundColor: THEME.card,
+                    borderColor: '#EB0000',
+                    color: THEME.text,
+                    borderRadius: '8px'
+                  }}
+                  whileHover={{ 
+                    backgroundColor: '#EB0000',
+                    color: '#ffffff',
+                    scale: 1.02
+                  }}
+                  whileTap={{ scale: 0.98 }}
+                  transition={{ duration: 0.2 }}
+                  role="status"
+                  aria-label="100% Anonymous"
+                >
+                  <FiShield size={20} aria-hidden="true" style={{ color: 'inherit' }} />
+                  <span className="text-sm font-bold uppercase tracking-wide">100% Anonymous</span>
+                </motion.button>
+                <motion.button
+                  className="flex items-center gap-2.5 px-5 py-3.5 rounded-lg border-2 min-h-[48px] transition-all"
+                  style={{
+                    backgroundColor: THEME.card,
+                    borderColor: '#EB0000',
+                    color: THEME.text,
+                    borderRadius: '8px'
+                  }}
+                  whileHover={{ 
+                    backgroundColor: '#EB0000',
+                    color: '#ffffff',
+                    scale: 1.02
+                  }}
+                  whileTap={{ scale: 0.98 }}
+                  transition={{ duration: 0.2 }}
+                  role="status"
+                  aria-label="NFC Enabled"
+                >
+                  <FiCreditCard size={20} aria-hidden="true" style={{ color: 'inherit' }} />
+                  <span className="text-sm font-bold uppercase tracking-wide">NFC Enabled</span>
+                </motion.button>
+                <motion.button
+                  className="flex items-center gap-2.5 px-5 py-3.5 rounded-lg border-2 min-h-[48px] transition-all"
+                  style={{
+                    backgroundColor: THEME.card,
+                    borderColor: '#EB0000',
+                    color: THEME.text,
+                    borderRadius: '8px'
+                  }}
+                  whileHover={{ 
+                    backgroundColor: '#EB0000',
+                    color: '#ffffff',
+                    scale: 1.02
+                  }}
+                  whileTap={{ scale: 0.98 }}
+                  transition={{ duration: 0.2 }}
+                  role="status"
+                  aria-label="Switzerland"
+                >
+                  <FiGlobe size={20} aria-hidden="true" style={{ color: 'inherit' }} />
+                  <span className="text-sm font-bold uppercase tracking-wide">Switzerland</span>
+                </motion.button>
+              </motion.div>
+            </motion.div>
+          </div>
+        </div>
       </motion.section>
 
-      {/* Booking Form - Mobile First Design */}
-      <section className="max-w-6xl mx-auto px-4 sm:px-6 py-4 sm:py-6">
-        <AnimatedCard className="p-4 sm:p-6 mb-4 sm:mb-6" style={{ backgroundColor: THEME.card }}>
-          <form onSubmit={handleSearch} className="space-y-4 sm:space-y-6">
-            {/* Ticket Type Selector */}
+      {/* Plus Globe Wallpaper Section - Black Background with Form Overlay */}
+      <motion.section 
+        className="relative overflow-hidden"
+        style={{ 
+          backgroundColor: '#000000',
+          backgroundImage: `radial-gradient(circle at 2px 2px, rgba(255,255,255,0.05) 1px, transparent 0)`,
+          backgroundSize: '40px 40px',
+          minHeight: '600px',
+          paddingTop: '2rem',
+          paddingBottom: '2rem'
+        }}
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ duration: 0.6 }}
+      >
+        {/* Subtle Globe Wallpaper - Positioned Right, Overflowing */}
+        <div className="absolute inset-0 opacity-20 overflow-visible">
+          <div className="absolute right-0 top-1/2 -translate-y-1/2 w-[150%] sm:w-[120%] md:w-[100%] lg:w-[80%] h-[150%] translate-x-[20%]">
+            <HeroGlobe />
+          </div>
+        </div>
+        
+        {/* Booking Form Overlay */}
+        <div className="relative z-10 max-w-6xl mx-auto px-4 sm:px-6">
+        <AnimatedCard className="p-4 sm:p-6 mb-4 sm:mb-6 rounded-lg" style={{ 
+          backgroundColor: THEME.card, 
+          borderRadius: '8px',
+          border: `1px solid ${THEME.border}`,
+          boxShadow: '0 4px 12px rgba(0, 0, 0, 0.3)'
+        }}>
+          <form onSubmit={handleSearch} className="space-y-4 sm:space-y-6" style={{ backgroundColor: 'transparent' }}>
+            {/* Ticket Type Selector - SBB Style */}
             <div>
-              <label className="block text-sm font-bold mb-3" style={{ color: THEME.text }}>
+              <label className="block text-sm font-bold mb-3 uppercase tracking-wide" style={{ color: THEME.text }}>
                 Ticket Type
               </label>
-              <div className="grid grid-cols-2 gap-2 sm:gap-3">
+              <div className="grid grid-cols-2 gap-3">
                 <motion.button
                   type="button"
                   onClick={() => handleInputChange('ticketType', 'single')}
-                  className="p-3 sm:p-4 border-2 flex items-center justify-center gap-2 font-bold text-xs sm:text-sm uppercase min-h-[48px]"
+                  className="p-4 border-2 flex items-center justify-center gap-2 font-bold text-sm uppercase min-h-[56px] rounded-lg transition-all"
                   style={{
-                    borderColor: formData.ticketType === 'single' ? THEME.accent : THEME.border,
-                    backgroundColor: formData.ticketType === 'single' ? `${THEME.accent}20` : THEME.surface,
-                    color: THEME.text
+                    borderColor: formData.ticketType === 'single' ? THEME.accent : '#666666',
+                    borderWidth: formData.ticketType === 'single' ? '3px' : '2px',
+                    backgroundColor: formData.ticketType === 'single' ? `${THEME.accent}20` : '#1a1a1a',
+                    color: THEME.text,
+                    borderRadius: '8px'
                   }}
                   whileHover={formData.ticketType !== 'single' ? { 
                     borderColor: THEME.accent,
-                    backgroundColor: `${THEME.accent}10`
+                    backgroundColor: '#2a2a2a'
                   } : {}}
                   whileTap={{ scale: 0.98 }}
+                  aria-label="Select single ticket"
+                  aria-pressed={formData.ticketType === 'single'}
                 >
-                  <FiCreditCard size={18} />
-                  Single Ticket
+                  <MdTrain size={20} style={{ color: formData.ticketType === 'single' ? THEME.accent : THEME.textMuted }} aria-hidden="true" />
+                  <span>Single Ticket</span>
                 </motion.button>
                 <motion.button
                   type="button"
                   onClick={() => handleInputChange('ticketType', 'pass')}
-                  className="p-3 sm:p-4 border-2 flex items-center justify-center gap-2 font-bold text-xs sm:text-sm uppercase min-h-[48px]"
+                  className="p-4 border-2 flex items-center justify-center gap-2 font-bold text-sm uppercase min-h-[56px] rounded-lg transition-all"
                   style={{
-                    borderColor: formData.ticketType === 'pass' ? THEME.accent : THEME.border,
-                    backgroundColor: formData.ticketType === 'pass' ? `${THEME.accent}20` : THEME.surface,
-                    color: THEME.text
+                    borderColor: formData.ticketType === 'pass' ? THEME.accent : '#666666',
+                    borderWidth: formData.ticketType === 'pass' ? '3px' : '2px',
+                    backgroundColor: formData.ticketType === 'pass' ? `${THEME.accent}20` : '#1a1a1a',
+                    color: THEME.text,
+                    borderRadius: '8px'
                   }}
                   whileHover={formData.ticketType !== 'pass' ? { 
                     borderColor: THEME.accent,
-                    backgroundColor: `${THEME.accent}10`
+                    backgroundColor: '#2a2a2a'
                   } : {}}
                   whileTap={{ scale: 0.98 }}
+                  aria-label="Select pass"
+                  aria-pressed={formData.ticketType === 'pass'}
                 >
-                  <FiGlobe size={18} />
-                  Pass
+                  <FiGlobe size={20} style={{ color: formData.ticketType === 'pass' ? THEME.accent : THEME.textMuted }} aria-hidden="true" />
+                  <span>Pass</span>
                 </motion.button>
               </div>
             </div>
@@ -303,28 +494,31 @@ const Home = memo(() => {
                       key={pass.value}
                       type="button"
                       onClick={() => handleInputChange('passType', pass.value)}
-                      className="p-3 sm:p-4 border-2 text-center min-h-[48px]"
+                      className="p-4 border-2 text-center min-h-[56px] rounded-lg transition-all"
                       whileTap={{ scale: 0.98 }}
                       style={{
-                        borderColor: formData.passType === pass.value ? THEME.accent : THEME.border,
-                        backgroundColor: formData.passType === pass.value ? `${THEME.accent}20` : THEME.surface,
-                        color: THEME.text
+                        borderColor: formData.passType === pass.value ? THEME.accent : '#666666',
+                        borderWidth: formData.passType === pass.value ? '3px' : '2px',
+                        backgroundColor: formData.passType === pass.value ? `${THEME.accent}20` : '#1a1a1a',
+                        color: THEME.text,
+                        borderRadius: '8px'
                       }}
                       onMouseEnter={(e) => {
                         if (formData.passType !== pass.value) {
                           e.target.style.borderColor = THEME.accent;
-                          e.target.style.backgroundColor = `${THEME.accent}10`;
+                          e.target.style.backgroundColor = '#2a2a2a';
                         }
                       }}
                       onMouseLeave={(e) => {
                         if (formData.passType !== pass.value) {
-                          e.target.style.borderColor = THEME.border;
-                          e.target.style.backgroundColor = THEME.surface;
+                          e.target.style.borderColor = '#666666';
+                          e.target.style.backgroundColor = '#1a1a1a';
                         }
                       }}
+                      aria-pressed={formData.passType === pass.value}
                     >
-                      <div className="font-bold text-xs sm:text-sm mb-1">{pass.label}</div>
-                      <div className="text-xs" style={{ color: THEME.textMuted }}>
+                      <div className="font-bold text-sm mb-1">{pass.label}</div>
+                      <div className="text-xs font-medium" style={{ color: formData.passType === pass.value ? THEME.accent : THEME.textMuted }}>
                         CHF {pass.price}
                       </div>
                     </motion.button>
@@ -333,14 +527,17 @@ const Home = memo(() => {
               </div>
             )}
 
-            {/* Origin and Destination (only for single tickets or non-countrywide passes) */}
+            {/* Origin and Destination - SBB Style with Icons */}
             {(formData.ticketType === 'single' || (formData.ticketType === 'pass' && formData.passType !== 'countrywide')) && (
-            <div className="grid md:grid-cols-2 gap-3 sm:gap-4">
+            <div className="grid md:grid-cols-2 gap-4">
               <div className="relative">
-                <label className="block text-sm font-bold mb-2" style={{ color: THEME.text }}>
+                <label className="block text-sm font-bold mb-2 uppercase tracking-wide" style={{ color: THEME.text }}>
                   From
                 </label>
                 <div className="relative">
+                  <div className="absolute left-4 top-1/2 -translate-y-1/2 z-10" style={{ color: '#666666' }}>
+                    <FiMapPin size={20} aria-hidden="true" />
+                  </div>
                   <input
                     type="text"
                     value={formData.origin}
@@ -348,23 +545,69 @@ const Home = memo(() => {
                     onFocus={() => formData.origin.length >= 2 && setShowOriginSuggestions(true)}
                     onBlur={() => setTimeout(() => setShowOriginSuggestions(false), 200)}
                     placeholder="Enter station name"
-                    className="w-full px-4 py-3 border-2 border-gray-300 focus:outline-none focus:border-red-600 bg-white text-black font-normal"
-                    style={{ borderColor: THEME.border, backgroundColor: THEME.card, color: THEME.text }}
+                    className="w-full pl-12 pr-4 py-3.5 border-2 focus:outline-none font-normal text-base rounded-lg"
+                    style={{ 
+                      borderColor: THEME.border, 
+                      backgroundColor: THEME.card, 
+                      color: THEME.text,
+                      borderRadius: '8px',
+                      paddingLeft: '48px'
+                    }}
+                    onFocus={(e) => {
+                      e.target.style.borderColor = THEME.accent;
+                      e.target.style.borderWidth = '3px';
+                      e.target.style.backgroundColor = THEME.surfaceHover;
+                    }}
+                    onBlur={(e) => {
+                      e.target.style.borderColor = THEME.border;
+                      e.target.style.borderWidth = '2px';
+                      e.target.style.backgroundColor = THEME.card;
+                    }}
                     required
+                    aria-label="Origin station"
+                    aria-describedby="origin-description"
+                    aria-autocomplete="list"
+                    aria-expanded={showOriginSuggestions}
+                    aria-controls="origin-suggestions"
                   />
+                  <span id="origin-description" className="sr-only">Enter the departure station name</span>
                   {showOriginSuggestions && originSuggestions.length > 0 && (
-                    <div className="absolute z-10 w-full mt-1 border-2 max-h-48 overflow-y-auto" style={{ borderColor: THEME.border, backgroundColor: THEME.card }}>
+                    <div 
+                      id="origin-suggestions"
+                      className="absolute z-10 w-full mt-2 border-2 max-h-48 overflow-y-auto rounded-lg shadow-lg" 
+                      style={{ 
+                        borderColor: THEME.border, 
+                        backgroundColor: THEME.card, 
+                        borderRadius: '8px',
+                        boxShadow: '0 4px 12px rgba(0, 0, 0, 0.5)'
+                      }}
+                      role="listbox"
+                      aria-label="Origin station suggestions"
+                    >
                       {originSuggestions.slice(0, 5).map((station, idx) => (
                         <button
                           key={idx}
                           type="button"
                           onClick={() => selectStation('origin', station)}
-                          className="w-full text-left px-4 py-2"
-                          style={{ color: THEME.text, backgroundColor: THEME.card }}
-                          onMouseEnter={(e) => e.target.style.backgroundColor = THEME.surfaceHover}
-                          onMouseLeave={(e) => e.target.style.backgroundColor = THEME.card}
+                          className="w-full text-left px-4 py-3 rounded flex items-center gap-2"
+                      style={{ 
+                        color: THEME.text, 
+                        backgroundColor: THEME.card,
+                        borderRadius: '4px'
+                      }}
+                      onMouseEnter={(e) => {
+                        e.target.style.backgroundColor = THEME.surfaceHover;
+                        e.target.style.color = THEME.accent;
+                      }}
+                      onMouseLeave={(e) => {
+                        e.target.style.backgroundColor = THEME.card;
+                        e.target.style.color = THEME.text;
+                      }}
+                          role="option"
+                          aria-label={`Select ${station.name} as origin`}
                         >
-                          {station.name}
+                          <FiMapPin size={16} style={{ color: '#666666' }} aria-hidden="true" />
+                          <span>{station.name}</span>
                         </button>
                       ))}
                     </div>
@@ -376,15 +619,20 @@ const Home = memo(() => {
                 <button
                   type="button"
                   onClick={swapStations}
-                  className="absolute right-2 top-9 p-2 text-accent hover:bg-surface transition-colors"
+                  className="absolute right-2 top-9 p-2 rounded-lg hover:bg-gray-100 transition-colors z-10"
+                  style={{ color: THEME.accent }}
                   aria-label="Swap stations"
+                  title="Swap origin and destination"
                 >
-                  <FiRepeat size={18} />
+                  <FiRepeat size={20} />
                 </button>
-                <label className="block text-sm font-bold mb-2" style={{ color: THEME.text }}>
+                <label className="block text-sm font-bold mb-2 uppercase tracking-wide" style={{ color: THEME.text }}>
                   To
                 </label>
                 <div className="relative">
+                  <div className="absolute left-4 top-1/2 -translate-y-1/2 z-10" style={{ color: '#666666' }}>
+                    <FiMapPin size={20} aria-hidden="true" />
+                  </div>
                   <input
                     type="text"
                     value={formData.destination}
@@ -392,23 +640,69 @@ const Home = memo(() => {
                     onFocus={() => formData.destination.length >= 2 && setShowDestinationSuggestions(true)}
                     onBlur={() => setTimeout(() => setShowDestinationSuggestions(false), 200)}
                     placeholder="Enter station name"
-                    className="w-full px-4 py-3 border-2 border-gray-300 focus:outline-none focus:border-red-600 bg-white text-black font-normal"
-                    style={{ borderColor: THEME.border, backgroundColor: THEME.card, color: THEME.text }}
+                    className="w-full pl-12 pr-4 py-3.5 border-2 focus:outline-none font-normal text-base rounded-lg"
+                    style={{ 
+                      borderColor: THEME.border, 
+                      backgroundColor: THEME.card, 
+                      color: THEME.text,
+                      borderRadius: '8px',
+                      paddingLeft: '48px'
+                    }}
+                    onFocus={(e) => {
+                      e.target.style.borderColor = THEME.accent;
+                      e.target.style.borderWidth = '3px';
+                      e.target.style.backgroundColor = THEME.surfaceHover;
+                    }}
+                    onBlur={(e) => {
+                      e.target.style.borderColor = THEME.border;
+                      e.target.style.borderWidth = '2px';
+                      e.target.style.backgroundColor = THEME.card;
+                    }}
                     required
+                    aria-label="Destination station"
+                    aria-describedby="destination-description"
+                    aria-autocomplete="list"
+                    aria-expanded={showDestinationSuggestions}
+                    aria-controls="destination-suggestions"
                   />
+                  <span id="destination-description" className="sr-only">Enter the arrival station name</span>
                   {showDestinationSuggestions && destinationSuggestions.length > 0 && (
-                    <div className="absolute z-10 w-full mt-1 border-2 max-h-48 overflow-y-auto" style={{ borderColor: THEME.border, backgroundColor: THEME.card }}>
+                    <div 
+                      id="destination-suggestions"
+                      className="absolute z-10 w-full mt-2 border-2 max-h-48 overflow-y-auto rounded-lg shadow-lg" 
+                      style={{ 
+                        borderColor: THEME.border, 
+                        backgroundColor: THEME.card, 
+                        borderRadius: '8px',
+                        boxShadow: '0 4px 12px rgba(0, 0, 0, 0.5)'
+                      }}
+                      role="listbox"
+                      aria-label="Destination station suggestions"
+                    >
                       {destinationSuggestions.slice(0, 5).map((station, idx) => (
                         <button
                           key={idx}
                           type="button"
                           onClick={() => selectStation('destination', station)}
-                          className="w-full text-left px-4 py-2"
-                          style={{ color: THEME.text, backgroundColor: THEME.card }}
-                          onMouseEnter={(e) => e.target.style.backgroundColor = THEME.surfaceHover}
-                          onMouseLeave={(e) => e.target.style.backgroundColor = THEME.card}
+                          className="w-full text-left px-4 py-3 rounded flex items-center gap-2"
+                      style={{ 
+                        color: THEME.text, 
+                        backgroundColor: THEME.card,
+                        borderRadius: '4px'
+                      }}
+                      onMouseEnter={(e) => {
+                        e.target.style.backgroundColor = THEME.surfaceHover;
+                        e.target.style.color = THEME.accent;
+                      }}
+                      onMouseLeave={(e) => {
+                        e.target.style.backgroundColor = THEME.card;
+                        e.target.style.color = THEME.text;
+                      }}
+                          role="option"
+                          aria-label={`Select ${station.name} as destination`}
                         >
-                          {station.name}
+                          <FiMapPin size={16} style={{ color: '#666666' }} aria-hidden="true" />
+                          <span>{station.name}</span>
                         </button>
                       ))}
                     </div>
@@ -418,171 +712,298 @@ const Home = memo(() => {
             </div>
             )}
 
-            {/* Date and Passengers */}
-            <div className="grid md:grid-cols-3 gap-3 sm:gap-4">
-              <div>
-                <label className="block text-sm font-bold mb-2" style={{ color: THEME.text }}>
+            {/* Date and Passengers - SBB Style with Icons */}
+            <div className="grid md:grid-cols-3 gap-4">
+              <div className="relative">
+                <label className="block text-sm font-bold mb-2 uppercase tracking-wide" style={{ color: THEME.text }}>
                   Date
                 </label>
-                <input
-                  type="date"
-                  value={formData.date}
-                  onChange={(e) => handleInputChange('date', e.target.value)}
-                  min={new Date().toISOString().split('T')[0]}
-                  className="w-full px-4 py-3 sm:py-4 border-2 focus:outline-none font-normal text-base"
-                  style={{ borderColor: THEME.border, backgroundColor: THEME.card, color: THEME.text, minHeight: '48px' }}
-                  onFocus={(e) => e.target.style.borderColor = THEME.accent}
-                  onBlur={(e) => e.target.style.borderColor = THEME.border}
-                  required
-                />
+                <div className="relative">
+                  <div className="absolute left-4 top-1/2 -translate-y-1/2 z-10" style={{ color: '#666666' }}>
+                    <FiCalendar size={20} aria-hidden="true" />
+                  </div>
+                  <input
+                    type="date"
+                    value={formData.date}
+                    onChange={(e) => handleInputChange('date', e.target.value)}
+                    min={new Date().toISOString().split('T')[0]}
+                    className="w-full pl-12 pr-4 py-3.5 border-2 focus:outline-none font-normal text-base rounded-lg"
+                    style={{ 
+                      borderColor: THEME.border, 
+                      backgroundColor: THEME.card, 
+                      color: THEME.text, 
+                      minHeight: '48px', 
+                      borderRadius: '8px',
+                      paddingLeft: '48px'
+                    }}
+                    onFocus={(e) => {
+                      e.target.style.borderColor = THEME.accent;
+                      e.target.style.borderWidth = '3px';
+                      e.target.style.backgroundColor = THEME.surfaceHover;
+                    }}
+                    onBlur={(e) => {
+                      e.target.style.borderColor = THEME.border;
+                      e.target.style.borderWidth = '2px';
+                      e.target.style.backgroundColor = THEME.card;
+                    }}
+                    required
+                    aria-label="Travel date"
+                  />
+                </div>
               </div>
 
-              <div>
-                <label className="block text-sm font-bold mb-2" style={{ color: THEME.text }}>
+              <div className="relative">
+                <label className="block text-sm font-bold mb-2 uppercase tracking-wide" style={{ color: THEME.text }}>
                   Passengers
                 </label>
-                <select
-                  value={formData.passengers}
-                  onChange={(e) => handleInputChange('passengers', parseInt(e.target.value))}
-                  className="w-full px-4 py-3 sm:py-4 border-2 focus:outline-none font-normal text-base"
-                  style={{ borderColor: THEME.border, backgroundColor: THEME.card, color: THEME.text, minHeight: '48px' }}
-                  onFocus={(e) => e.target.style.borderColor = THEME.accent}
-                  onBlur={(e) => e.target.style.borderColor = THEME.border}
-                >
-                  {[1, 2, 3, 4, 5, 6].map(num => (
-                    <option key={num} value={num}>{num} {num === 1 ? 'passenger' : 'passengers'}</option>
-                  ))}
-                </select>
+                <div className="relative">
+                  <div className="absolute left-4 top-1/2 -translate-y-1/2 z-10 pointer-events-none" style={{ color: '#666666' }}>
+                    <FiUsers size={20} aria-hidden="true" />
+                  </div>
+                  <select
+                    value={formData.passengers}
+                    onChange={(e) => handleInputChange('passengers', parseInt(e.target.value))}
+                    className="w-full pl-12 pr-10 py-3.5 border-2 focus:outline-none font-normal text-base rounded-lg appearance-none bg-white"
+                    style={{ 
+                      borderColor: THEME.border, 
+                      backgroundColor: THEME.card, 
+                      color: THEME.text, 
+                      minHeight: '48px', 
+                      borderRadius: '8px',
+                      paddingLeft: '48px',
+                      backgroundImage: 'url("data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' width=\'12\' height=\'12\' viewBox=\'0 0 12 12\'%3E%3Cpath fill=\'%23ffffff\' d=\'M6 9L1 4h10z\'/%3E%3C/svg%3E")',
+                      backgroundRepeat: 'no-repeat',
+                      backgroundPosition: 'right 16px center'
+                    }}
+                    onFocus={(e) => {
+                      e.target.style.borderColor = THEME.accent;
+                      e.target.style.borderWidth = '3px';
+                      e.target.style.backgroundColor = THEME.surfaceHover;
+                    }}
+                    onBlur={(e) => {
+                      e.target.style.borderColor = THEME.border;
+                      e.target.style.borderWidth = '2px';
+                      e.target.style.backgroundColor = THEME.card;
+                    }}
+                    aria-label="Number of passengers"
+                  >
+                    {[1, 2, 3, 4, 5, 6].map(num => (
+                      <option key={num} value={num} style={{ backgroundColor: '#1a1a1a', color: '#ffffff' }}>
+                        {num} {num === 1 ? 'passenger' : 'passengers'}
+                      </option>
+                    ))}
+                  </select>
+                </div>
               </div>
 
               <div className="flex items-end">
-                <label className="flex items-center space-x-2 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={formData.returnTrip}
-                    onChange={(e) => handleInputChange('returnTrip', e.target.checked)}
-                    className="w-5 h-5 text-accent border-2 border-border focus:ring-2 focus:ring-accent cursor-pointer"
-                  />
-                  <span className="text-sm" style={{ color: THEME.text }}>Return trip</span>
+                <label className="flex items-center gap-3 cursor-pointer group" style={{ paddingBottom: '4px' }}>
+                  <div className="relative">
+                    <input
+                      type="checkbox"
+                      checked={formData.returnTrip}
+                      onChange={(e) => handleInputChange('returnTrip', e.target.checked)}
+                      className="sr-only"
+                      aria-label="Return trip"
+                    />
+                    <div 
+                      className="w-6 h-6 border-2 rounded flex items-center justify-center transition-all"
+                      style={{
+                        borderColor: formData.returnTrip ? THEME.accent : '#666666',
+                        backgroundColor: formData.returnTrip ? THEME.accent : 'transparent',
+                        borderRadius: '4px'
+                      }}
+                    >
+                      {formData.returnTrip && (
+                        <svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
+                          <path d="M11.6667 3.5L5.25 9.91667L2.33334 7" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                        </svg>
+                      )}
+                    </div>
+                  </div>
+                  <span className="text-sm font-medium" style={{ color: THEME.text }}>Return trip</span>
                 </label>
               </div>
             </div>
 
             {formData.returnTrip && (
-              <div>
-                <label className="block text-sm font-bold mb-2" style={{ color: THEME.text }}>
+              <div className="relative">
+                <label className="block text-sm font-bold mb-2 uppercase tracking-wide" style={{ color: THEME.text }}>
                   Return Date
                 </label>
-                <input
-                  type="date"
-                  value={formData.returnDate}
-                  onChange={(e) => handleInputChange('returnDate', e.target.value)}
-                  min={formData.date}
-                  className="w-full px-4 py-3 border-2 focus:outline-none font-normal"
-                  style={{ borderColor: THEME.border, backgroundColor: THEME.card, color: THEME.text }}
-                  onFocus={(e) => e.target.style.borderColor = THEME.accent}
-                  onBlur={(e) => e.target.style.borderColor = THEME.border}
-                  required={formData.returnTrip}
-                />
+                <div className="relative">
+                  <div className="absolute left-4 top-1/2 -translate-y-1/2 z-10" style={{ color: '#666666' }}>
+                    <FiCalendar size={20} aria-hidden="true" />
+                  </div>
+                  <input
+                    type="date"
+                    value={formData.returnDate}
+                    onChange={(e) => handleInputChange('returnDate', e.target.value)}
+                    min={formData.date}
+                    className="w-full pl-12 pr-4 py-3.5 border-2 focus:outline-none font-normal text-base rounded-lg"
+                    style={{ 
+                      borderColor: THEME.border, 
+                      backgroundColor: THEME.card, 
+                      color: THEME.text,
+                      borderRadius: '8px',
+                      paddingLeft: '48px'
+                    }}
+                    onFocus={(e) => {
+                      e.target.style.borderColor = THEME.accent;
+                      e.target.style.borderWidth = '3px';
+                      e.target.style.backgroundColor = THEME.surfaceHover;
+                    }}
+                    onBlur={(e) => {
+                      e.target.style.borderColor = THEME.border;
+                      e.target.style.borderWidth = '2px';
+                      e.target.style.backgroundColor = THEME.card;
+                    }}
+                    required={formData.returnTrip}
+                    aria-label="Return date"
+                  />
+                </div>
               </div>
             )}
 
-            {/* Search Button - SBB Mobile Style */}
-            <AnimatedButton
+            {/* Search Button - SBB Style */}
+            <motion.button
               type="submit"
               disabled={isSearching}
-              loading={isSearching}
-              variant="primary"
-              className="w-full px-6 py-4 sm:py-5 text-base sm:text-lg font-bold"
-              icon={formData.ticketType === 'pass' ? FiCreditCard : FiSearch}
+              className="w-full px-6 py-4 text-base font-bold uppercase tracking-wide rounded-lg flex items-center justify-center gap-2 min-h-[56px] transition-all"
+              style={{
+                backgroundColor: isSearching ? '#999999' : THEME.accent,
+                color: '#ffffff',
+                borderRadius: '8px',
+                border: 'none',
+                cursor: isSearching ? 'not-allowed' : 'pointer'
+              }}
+              whileHover={!isSearching ? { backgroundColor: '#d10000' } : {}}
+              whileTap={!isSearching ? { scale: 0.98 } : {}}
+              aria-label={isSearching ? 'Searching connections' : formData.ticketType === 'pass' ? 'Purchase pass' : 'Search train connections'}
             >
-              {isSearching ? 'Searching...' : formData.ticketType === 'pass' ? 'Purchase Pass' : 'Search Connections'}
-            </AnimatedButton>
+              {isSearching ? (
+                <>
+                  <motion.div
+                    animate={{ rotate: 360 }}
+                    transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
+                    style={{ width: '20px', height: '20px', border: '2px solid white', borderTopColor: 'transparent', borderRadius: '50%' }}
+                  />
+                  <span>Searching...</span>
+                </>
+              ) : (
+                <>
+                  <FiSearch size={20} aria-hidden="true" />
+                  <span>{formData.ticketType === 'pass' ? 'Purchase Pass' : 'Search Connections'}</span>
+                </>
+              )}
+            </motion.button>
 
-            {/* Error Message */}
+            {/* Error Message - SBB Self-Explanatory principle */}
             <AnimatePresence>
               {searchError && (
                 <motion.div
                   initial={{ opacity: 0, y: -10 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: -10 }}
-                  className="flex items-center gap-2 p-3 border-2" 
-                  style={{ backgroundColor: `${THEME.accent}15`, borderColor: THEME.accent }}
+                  className="flex items-center gap-2 p-3 border-2 rounded-lg" 
+                  style={{ backgroundColor: `${THEME.accent}15`, borderColor: THEME.accent, borderRadius: '8px' }}
+                  role="alert"
+                  aria-live="assertive"
                 >
-                  <FiAlertCircle style={{ color: THEME.accent }} />
+                  <FiAlertCircle style={{ color: THEME.accent }} aria-hidden="true" />
                   <span className="text-sm" style={{ color: THEME.accent }}>{searchError}</span>
                 </motion.div>
               )}
             </AnimatePresence>
           </form>
         </AnimatedCard>
-
-        {/* Search Results - SBB Mobile Style */}
+        
+        {/* Search Results - SBB Style with Improved Spacing */}
         <AnimatePresence>
           {searchResults && (
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -20 }}
-              className="p-4" 
-              style={{ backgroundColor: THEME.card }}
+              className="mt-6"
             >
-              <h2 className="text-lg font-bold mb-4" style={{ color: THEME.text }}>
-                Connections: {formData.origin} → {formData.destination}
-              </h2>
-              <div className="space-y-2">
+              <div className="mb-6">
+                <h2 className="text-xl font-bold mb-2 uppercase tracking-wide" style={{ color: THEME.text }}>
+                  Connections
+                </h2>
+                <p className="text-sm" style={{ color: THEME.textMuted }}>
+                  {formData.origin} → {formData.destination}
+                </p>
+              </div>
+              <div className="space-y-4">
                 {searchResults.map((trip, index) => (
                   <AnimatedCard
                     key={trip.id}
-                    delay={index * 0.1}
-                    className="p-4"
-                    style={{ borderLeft: `4px solid ${THEME.accent}`, backgroundColor: THEME.card }}
-                    whileHover={{ backgroundColor: THEME.surfaceHover }}
+                    delay={index * 0.05}
+                    className="rounded-lg border-2"
+                    style={{ 
+                      borderColor: THEME.border,
+                      backgroundColor: THEME.card, 
+                      borderRadius: '8px',
+                      boxShadow: '0 2px 8px rgba(0, 0, 0, 0.2)'
+                    }}
+                    whileHover={{ 
+                      backgroundColor: THEME.surfaceHover,
+                      borderColor: THEME.accent,
+                      scale: 1.01
+                    }}
                   >
-                  <div className="flex flex-col gap-4">
-                    {/* Time and Route Info */}
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-4">
-                        <div>
-                          <div className="text-2xl font-bold" style={{ color: THEME.text }}>{trip.departure}</div>
-                          <div className="text-xs" style={{ color: THEME.textMuted }}>{formData.origin}</div>
-                        </div>
-                        <div className="font-bold" style={{ color: THEME.accent }}>→</div>
-                        <div>
-                          <div className="text-2xl font-bold" style={{ color: THEME.text }}>{trip.arrival}</div>
-                          <div className="text-xs" style={{ color: '#999999' }}>{formData.destination}</div>
-                        </div>
-                      </div>
-                      <div className="text-right">
-                        <div className="text-sm font-bold" style={{ color: '#EB0000' }}>
-                          {trip.price ? `CHF ${trip.price.toFixed(2)}` : 'Price on sbb.ch'}
-                        </div>
-                        {trip.price && formData.passengers > 1 && (
-                          <div className="text-xs" style={{ color: '#999999' }}>
-                            CHF {(trip.price * formData.passengers).toFixed(2)} total
+                    <div className="p-5 sm:p-6">
+                      {/* Time and Route Info - Improved Layout */}
+                      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-5 pb-5 border-b" style={{ borderColor: THEME.border }}>
+                        <div className="flex items-center gap-4 sm:gap-6">
+                          <div className="text-center sm:text-left">
+                            <div className="text-3xl sm:text-4xl font-bold mb-1" style={{ color: THEME.text }}>{trip.departure}</div>
+                            <div className="text-xs uppercase tracking-wide" style={{ color: THEME.textMuted }}>{formData.origin}</div>
                           </div>
-                        )}
+                          <div className="flex-shrink-0">
+                            <div className="text-2xl font-bold" style={{ color: THEME.accent }}>→</div>
+                          </div>
+                          <div className="text-center sm:text-left">
+                            <div className="text-3xl sm:text-4xl font-bold mb-1" style={{ color: THEME.text }}>{trip.arrival}</div>
+                            <div className="text-xs uppercase tracking-wide" style={{ color: THEME.textMuted }}>{formData.destination}</div>
+                          </div>
+                        </div>
+                        <div className="text-center sm:text-right sm:min-w-[120px]">
+                          <div className="text-lg sm:text-xl font-bold mb-1" style={{ color: THEME.accent }}>
+                            {trip.price ? `CHF ${trip.price.toFixed(2)}` : 'Price on sbb.ch'}
+                          </div>
+                          {trip.price && formData.passengers > 1 && (
+                            <div className="text-xs" style={{ color: THEME.textMuted }}>
+                              CHF {(trip.price * formData.passengers).toFixed(2)} total
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                      
+                      {/* Train Info - Better Spacing */}
+                      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                        <div className="flex flex-wrap items-center gap-3 sm:gap-4 text-sm">
+                          <div className="flex items-center gap-2">
+                            <span className="font-bold uppercase tracking-wide" style={{ color: THEME.accent }}>{trip.train}</span>
+                          </div>
+                          <div className="w-px h-4" style={{ backgroundColor: THEME.border }}></div>
+                          <span style={{ color: THEME.textMuted }}>{trip.duration}</span>
+                          <div className="w-px h-4" style={{ backgroundColor: THEME.border }}></div>
+                          <span style={{ color: THEME.textMuted }}>
+                            {trip.changes === 0 ? 'Direct' : `${trip.changes} change${trip.changes > 1 ? 's' : ''}`}
+                          </span>
+                        </div>
+                        <AnimatedButton
+                          onClick={() => handleBook(trip)}
+                          variant="primary"
+                          className="px-6 py-3 text-sm font-bold uppercase tracking-wide rounded-lg min-h-[48px]"
+                          aria-label={`Book trip from ${formData.origin} to ${formData.destination} departing at ${trip.departure}`}
+                        >
+                          Book Now
+                        </AnimatedButton>
                       </div>
                     </div>
-                    
-                    {/* Train Info */}
-                    <div className="flex items-center justify-between text-sm">
-                      <div className="flex items-center gap-4">
-                        <span className="font-bold" style={{ color: THEME.accent }}>{trip.train}</span>
-                        <span style={{ color: THEME.textMuted }}>{trip.duration}</span>
-                        <span style={{ color: THEME.textMuted }}>
-                          {trip.changes === 0 ? 'Direct' : `${trip.changes} change${trip.changes > 1 ? 's' : ''}`}
-                        </span>
-                      </div>
-                      <AnimatedButton
-                        onClick={() => handleBook(trip)}
-                        variant="primary"
-                        className="px-4 py-2 text-sm"
-                      >
-                        Book
-                      </AnimatedButton>
-                    </div>
-                  </div>
                   </AnimatedCard>
                 ))}
               </div>
@@ -597,8 +1018,10 @@ const Home = memo(() => {
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.95 }}
-              className="p-4 mb-6" 
-              style={{ backgroundColor: THEME.card, border: `2px solid ${THEME.accent}` }}
+              className="p-4 mb-6 rounded-lg" 
+              style={{ backgroundColor: THEME.card, border: `2px solid ${THEME.accent}`, borderRadius: '8px' }}
+              role="region"
+              aria-label="Purchased ticket information"
             >
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-2">
@@ -610,8 +1033,9 @@ const Home = memo(() => {
               <AnimatedButton
                 onClick={handlePrintTicket}
                 variant="primary"
-                className="px-4 py-2 text-sm"
+                className="px-4 py-2 text-sm rounded-lg"
                 icon={FiPrinter}
+                aria-label="Print ticket"
               >
                 Print Ticket
               </AnimatedButton>
@@ -720,7 +1144,11 @@ const Home = memo(() => {
             </motion.div>
           )}
         </AnimatePresence>
-      </section>
+        </div>
+      </motion.section>
+
+      {/* Mobile Sidebar */}
+      <MobileSidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
     </motion.div>
   );
 });

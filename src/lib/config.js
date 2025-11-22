@@ -20,9 +20,9 @@
  */
 const websiteInfo = {
   site: {
-    name: "SBB Anonymous Tickets",
-    description: "Anonymous public transport tickets - No personal data required",
-    author: "SBB CFF FFS",
+    name: "NodePass",
+    description: "Anonymous ticket system - No personal data required",
+    author: "NodePass",
     links: {
       github: "https://www.sbb.ch",
       documentation: "/docs"

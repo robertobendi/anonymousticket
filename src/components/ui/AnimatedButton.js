@@ -16,19 +16,20 @@ const AnimatedButton = memo(({
   ...props
 }) => {
   const baseStyles = {
-    minHeight: '48px', // Mobile touch target
+    minHeight: '48px', // SBB minimum touch target
     minWidth: '44px',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
     gap: '8px',
-    fontWeight: 'bold',
+    fontWeight: '700', // SBB bold
     textTransform: 'uppercase',
     letterSpacing: '0.5px',
+    fontSize: '14px', // SBB button text
     transition: 'all 0.2s ease',
     cursor: disabled ? 'not-allowed' : 'pointer',
     border: 'none',
-    borderRadius: '4px',
+    borderRadius: '8px', // SBB rounded corners
   };
 
   const variantStyles = {

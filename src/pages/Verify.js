@@ -1,13 +1,14 @@
 import { useState, useEffect, memo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { FiRadio, FiCheckCircle, FiXCircle, FiAlertCircle, FiRefreshCw, FiArrowLeft, FiChevronDown, FiChevronUp } from 'react-icons/fi';
+import { FiRadio, FiCheckCircle, FiXCircle, FiAlertCircle, FiRefreshCw, FiArrowLeft, FiChevronDown, FiChevronUp, FiMenu } from 'react-icons/fi';
 import { checkNFC, startReading, requestNFCPermission } from '@lib/nfc-simple';
 import { parseNFCTicketData } from '@lib/nfc';
 import { verifyTicket, parseQRCodeData } from '@lib/ticketGenerator';
 import { THEME } from '@lib/themeColors';
 import AnimatedCard from '@components/ui/AnimatedCard';
 import AnimatedButton from '@components/ui/AnimatedButton';
+import MobileSidebar from '@components/ui/MobileSidebar';
 
 /**
  * Ticket Verification Page
@@ -15,6 +16,7 @@ import AnimatedButton from '@components/ui/AnimatedButton';
  */
 const Verify = memo(() => {
   const navigate = useNavigate();
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const [isReading, setIsReading] = useState(false);
   const [verificationResult, setVerificationResult] = useState(null);
   const [error, setError] = useState(null);
@@ -199,17 +201,30 @@ const Verify = memo(() => {
       transition={{ duration: 0.3 }}
     >
       <div className="max-w-2xl mx-auto px-4 py-4 sm:py-6">
-        {/* Back Button */}
-        <motion.button
-          onClick={() => navigate('/')}
-          className="flex items-center gap-2 mb-4 sm:mb-6 text-sm font-bold"
-          style={{ color: THEME.text }}
-          whileHover={{ opacity: 0.7 }}
-          whileTap={{ scale: 0.95 }}
-        >
-          <FiArrowLeft size={18} style={{ width: '18px', height: '18px' }} />
-          <span>Back</span>
-        </motion.button>
+        {/* Header with Menu Button */}
+        <div className="flex items-center justify-between mb-4 sm:mb-6">
+          <motion.button
+            onClick={() => navigate('/')}
+            className="flex items-center gap-2 text-sm font-bold min-h-[44px]"
+            style={{ color: THEME.text }}
+            whileHover={{ opacity: 0.7 }}
+            whileTap={{ scale: 0.95 }}
+          >
+            <FiArrowLeft size={18} style={{ width: '18px', height: '18px' }} />
+            <span className="hidden sm:inline">Back</span>
+          </motion.button>
+          
+          <motion.button
+            onClick={() => setSidebarOpen(true)}
+            className="md:hidden p-2 min-w-[44px] min-h-[44px] flex items-center justify-center"
+            style={{ color: THEME.text }}
+            whileHover={{ scale: 1.1, rotate: 90 }}
+            whileTap={{ scale: 0.9 }}
+            aria-label="Open menu"
+          >
+            <FiMenu size={24} />
+          </motion.button>
+        </div>
 
         {/* Header */}
         <motion.div 
@@ -242,7 +257,7 @@ const Verify = memo(() => {
         </motion.div>
 
         {/* NFC Status Display - SHOWS ON SCREEN */}
-        <div className="p-3 sm:p-4 mb-4 sm:mb-6 border-2 rounded" style={{ backgroundColor: nfcAvailable ? `${THEME.accent}15` : '#ff000015', borderColor: nfcAvailable ? THEME.accent : '#ff0000' }}>
+        <div className="p-3 sm:p-4 mb-4 sm:mb-6 border-2 rounded-lg" style={{ backgroundColor: nfcAvailable ? `${THEME.accent}15` : '#ff000015', borderColor: nfcAvailable ? THEME.accent : '#ff0000', borderRadius: '8px' }} role="status" aria-live="polite">
           <div className="flex items-start gap-2 mb-2">
             <FiAlertCircle size={20} style={{ color: nfcAvailable ? THEME.accent : '#ff0000', marginTop: '2px' }} />
             <div className="flex-1">
@@ -274,15 +289,16 @@ const Verify = memo(() => {
         )}
 
         {/* Verification Card */}
-        <AnimatedCard className="p-4 sm:p-6 mb-4 sm:mb-6 rounded" style={{ backgroundColor: THEME.card, border: `2px solid ${THEME.border}` }}>
+        <AnimatedCard className="p-4 sm:p-6 mb-4 sm:mb-6 rounded-lg" style={{ backgroundColor: THEME.card, border: `2px solid ${THEME.border}`, borderRadius: '8px' }}>
           {/* NFC Read Button */}
           <AnimatedButton
             onClick={handleReadNFC}
             disabled={isReading}
             loading={isReading}
             variant="primary"
-            className="w-full py-4 sm:py-5 text-base sm:text-lg mb-3 sm:mb-4 rounded"
+            className="w-full py-4 sm:py-5 text-base sm:text-lg mb-3 sm:mb-4 rounded-lg"
             icon={FiRadio}
+            aria-label={isReading ? 'Reading NFC tag' : 'Scan NFC tag or beacon'}
           >
             {isReading ? 'Reading NFC...' : 'Scan NFC Tag / Beacon'}
           </AnimatedButton>
@@ -297,7 +313,8 @@ const Verify = memo(() => {
           <AnimatedButton
             onClick={handleManualVerify}
             variant="secondary"
-            className="w-full py-3 sm:py-4 text-xs sm:text-sm rounded"
+            className="w-full py-3 sm:py-4 text-xs sm:text-sm rounded-lg"
+            aria-label="Enter ticket code manually"
           >
             Enter Code Manually
           </AnimatedButton>
@@ -310,8 +327,10 @@ const Verify = memo(() => {
               initial={{ opacity: 0, y: -10 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -10 }}
-              className="p-3 sm:p-4 mb-4 sm:mb-6 border-2 rounded" 
-              style={{ backgroundColor: '#ff000015', borderColor: '#ff0000' }}
+              className="p-3 sm:p-4 mb-4 sm:mb-6 border-2 rounded-lg" 
+              style={{ backgroundColor: '#ff000015', borderColor: '#ff0000', borderRadius: '8px' }}
+              role="alert"
+              aria-live="assertive"
             >
             <div className="flex items-start gap-2">
               <FiXCircle style={{ color: '#ff0000', marginTop: '2px', flexShrink: 0 }} size={18} />
@@ -331,11 +350,15 @@ const Verify = memo(() => {
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.95 }}
-              className="p-4 sm:p-6 border-2 rounded" 
+              className="p-4 sm:p-6 border-2 rounded-lg" 
               style={{ 
                 backgroundColor: verificationResult.valid ? `${THEME.success}15` : `${THEME.accent}15`,
-                borderColor: verificationResult.valid ? THEME.success : THEME.accent
+                borderColor: verificationResult.valid ? THEME.success : THEME.accent,
+                borderRadius: '8px'
               }}
+              role="status"
+              aria-live="polite"
+              aria-atomic="true"
             >
             <div className="flex items-start gap-3 mb-4">
               {verificationResult.valid ? (
@@ -455,8 +478,9 @@ const Verify = memo(() => {
                 setShowRawData(false);
               }}
               variant="secondary"
-              className="mt-4 w-full py-3 sm:py-3.5 text-xs sm:text-sm rounded"
+              className="mt-4 w-full py-3 sm:py-3.5 text-xs sm:text-sm rounded-lg"
               icon={FiRefreshCw}
+              aria-label="Scan another ticket"
             >
               Scan Another Ticket
             </AnimatedButton>
@@ -464,6 +488,9 @@ const Verify = memo(() => {
           )}
         </AnimatePresence>
       </div>
+
+      {/* Mobile Sidebar */}
+      <MobileSidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
     </motion.div>
   );
 });

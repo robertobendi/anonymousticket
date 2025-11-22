@@ -1,19 +1,21 @@
 import { useState, useEffect, memo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { FiArrowLeft, FiRadio, FiTrash2, FiSend, FiCreditCard, FiGlobe, FiAlertCircle } from 'react-icons/fi';
+import { FiArrowLeft, FiRadio, FiTrash2, FiSend, FiCreditCard, FiGlobe, FiAlertCircle, FiMenu } from 'react-icons/fi';
 import { useWallet, getWalletForNFC } from '@lib/wallet';
 import { writeNFC, startBeacon, stopBeacon } from '@lib/nfc-simple';
 import { checkNFC } from '@lib/nfc-simple';
 import { THEME } from '@lib/themeColors';
 import AnimatedCard from '@components/ui/AnimatedCard';
 import AnimatedButton from '@components/ui/AnimatedButton';
+import MobileSidebar from '@components/ui/MobileSidebar';
 
 /**
  * Wallet page - View tickets and send wallet via NFC
  */
 const Wallet = memo(() => {
   const navigate = useNavigate();
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const [tickets, addTicket, removeTicket, clearAll] = useWallet();
   const [isSending, setIsSending] = useState(false);
   const [sendError, setSendError] = useState(null);
@@ -166,22 +168,32 @@ const Wallet = memo(() => {
         >
           <motion.button
             onClick={() => navigate('/')}
-            className="flex items-center gap-2 text-sm font-bold"
+            className="flex items-center gap-2 text-sm font-bold min-h-[44px]"
             style={{ color: THEME.text }}
             whileHover={{ opacity: 0.7 }}
             whileTap={{ scale: 0.95 }}
           >
             <FiArrowLeft size={18} />
-            <span>Back</span>
+            <span className="hidden sm:inline">Back</span>
           </motion.button>
-          <h1 className="text-2xl font-bold" style={{ color: THEME.text }}>
+          <h1 className="text-xl sm:text-2xl font-bold" style={{ color: THEME.text }}>
             My Wallet
           </h1>
-          <div style={{ width: '60px' }}></div> {/* Spacer for centering */}
+          <motion.button
+            onClick={() => setSidebarOpen(true)}
+            className="md:hidden p-2 min-w-[44px] min-h-[44px] flex items-center justify-center"
+            style={{ color: THEME.text }}
+            whileHover={{ scale: 1.1, rotate: 90 }}
+            whileTap={{ scale: 0.9 }}
+            aria-label="Open menu"
+          >
+            <FiMenu size={24} />
+          </motion.button>
+          <div className="hidden md:block" style={{ width: '60px' }}></div> {/* Spacer for centering on desktop */}
         </motion.div>
 
         {/* NFC Send Section */}
-        <AnimatedCard className="p-4 mb-6" style={{ backgroundColor: THEME.card, border: `2px solid ${THEME.border}` }}>
+        <AnimatedCard className="p-4 mb-6 rounded-lg" style={{ backgroundColor: THEME.card, border: `2px solid ${THEME.border}`, borderRadius: '8px' }}>
           <div className="mb-4">
             <h2 className="text-lg font-bold mb-1" style={{ color: THEME.text }}>
               Share Tickets via NFC
@@ -272,7 +284,7 @@ const Wallet = memo(() => {
         {/* Tickets List */}
         <AnimatePresence mode="wait">
           {tickets.length === 0 ? (
-            <AnimatedCard className="p-8 text-center" style={{ backgroundColor: THEME.card, border: `2px solid ${THEME.border}` }}>
+            <AnimatedCard className="p-8 text-center rounded-lg" style={{ backgroundColor: THEME.card, border: `2px solid ${THEME.border}`, borderRadius: '8px' }}>
             <FiCreditCard size={48} style={{ color: THEME.textMuted, margin: '0 auto 16px' }} />
             <p className="text-sm font-bold mb-2" style={{ color: THEME.text }}>
               No tickets in wallet
@@ -294,8 +306,8 @@ const Wallet = memo(() => {
                 <AnimatedCard
                   key={ticket.id}
                   delay={index * 0.1}
-                  className="p-4"
-                  style={{ backgroundColor: THEME.card, border: `2px solid ${THEME.border}` }}
+                  className="p-4 rounded-lg"
+                  style={{ backgroundColor: THEME.card, border: `2px solid ${THEME.border}`, borderRadius: '8px' }}
                   whileHover={{ scale: 1.01 }}
                 >
                 <div className="flex items-start justify-between gap-4">
@@ -387,6 +399,9 @@ const Wallet = memo(() => {
           )}
         </AnimatePresence>
       </div>
+
+      {/* Mobile Sidebar */}
+      <MobileSidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
     </motion.div>
   );
 });

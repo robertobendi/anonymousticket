@@ -1,6 +1,6 @@
 {
   "appId": "ch.sbb.anonymous",
-  "appName": "SBB Anonymous Tickets",
+  "appName": "NodePass - Anonymous Tickets",
   "webDir": "build",
   "bundledWebRuntime": false,
   "plugins": {

@@ -23,11 +23,13 @@ export default {
       },
       borderRadius: {
         'none': '0',
-        'sm': '2px',
-        'DEFAULT': '2px',
-        'md': '2px',
-        'lg': '2px',
-        'xl': '2px',
+        'sm': '4px',
+        'DEFAULT': '8px', // SBB standard rounded corners
+        'md': '8px',
+        'lg': '12px',
+        'xl': '16px',
+        '2xl': '24px',
+        'full': '9999px',
       },
       boxShadow: {
         card: '0 2px 8px 0 rgba(0, 0, 0, 0.1)',
@@ -41,16 +43,39 @@ export default {
           'sans-serif',
         ],
       },
+      fontWeight: {
+        normal: '400',
+        medium: '500',
+        semibold: '600',
+        bold: '700',
+      },
+      spacing: {
+        // SBB spacing system (4px base unit)
+        '0.5': '2px',
+        '1': '4px',
+        '1.5': '6px',
+        '2': '8px',
+        '3': '12px',
+        '4': '16px',
+        '5': '20px',
+        '6': '24px',
+        '8': '32px',
+        '10': '40px',
+        '12': '48px',
+        '16': '64px',
+        '20': '80px',
+        '24': '96px',
+      },
       fontSize: {
-        'xs': ['11px', '16px'],
-        'sm': ['13px', '18px'],
-        'base': ['15px', '22px'],
-        'lg': ['17px', '24px'],
-        'xl': ['19px', '28px'],
-        '2xl': ['23px', '32px'],
-        '3xl': ['28px', '36px'],
-        '4xl': ['34px', '42px'],
-        '5xl': ['40px', '48px'],
+        'xs': ['12px', { lineHeight: '18px', letterSpacing: '0.01em' }], // SBB small text
+        'sm': ['14px', { lineHeight: '20px', letterSpacing: '0.01em' }], // SBB body small
+        'base': ['16px', { lineHeight: '24px', letterSpacing: '0' }], // SBB body
+        'lg': ['18px', { lineHeight: '26px', letterSpacing: '0' }], // SBB body large
+        'xl': ['20px', { lineHeight: '28px', letterSpacing: '-0.01em' }], // SBB heading small
+        '2xl': ['24px', { lineHeight: '32px', letterSpacing: '-0.01em' }], // SBB heading
+        '3xl': ['28px', { lineHeight: '36px', letterSpacing: '-0.02em' }], // SBB heading large
+        '4xl': ['32px', { lineHeight: '40px', letterSpacing: '-0.02em' }], // SBB display small
+        '5xl': ['40px', { lineHeight: '48px', letterSpacing: '-0.02em' }], // SBB display
       },
     },
   },
