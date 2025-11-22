@@ -175,11 +175,11 @@ export function verifyTicket(ticket) {
   
   // For passes (daily, weekly, monthly, countrywide)
   if (ticket.type === 'pass' || ticket.passType) {
-    if (ticket.validUntil) {
-      const validUntil = new Date(ticket.validUntil);
+  if (ticket.validUntil) {
+    const validUntil = new Date(ticket.validUntil);
       const validFrom = ticket.validFrom ? new Date(ticket.validFrom) : null;
       
-      const isExpired = now > validUntil;
+    const isExpired = now > validUntil;
       const isFuture = validFrom ? now < validFrom : false;
       
       return {

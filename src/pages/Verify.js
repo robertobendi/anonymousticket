@@ -1,10 +1,13 @@
 import { useState, useEffect, memo } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { motion, AnimatePresence } from 'framer-motion';
 import { FiRadio, FiCheckCircle, FiXCircle, FiAlertCircle, FiRefreshCw, FiArrowLeft, FiChevronDown, FiChevronUp } from 'react-icons/fi';
 import { checkNFC, startReading, requestNFCPermission } from '@lib/nfc-simple';
 import { parseNFCTicketData } from '@lib/nfc';
 import { verifyTicket, parseQRCodeData } from '@lib/ticketGenerator';
 import { THEME } from '@lib/themeColors';
+import AnimatedCard from '@components/ui/AnimatedCard';
+import AnimatedButton from '@components/ui/AnimatedButton';
 
 /**
  * Ticket Verification Page
@@ -59,7 +62,7 @@ const Verify = memo(() => {
         setIsReading(false);
         return;
       }
-      
+
       if (!status.enabled) {
         setError('NFC is disabled. Please enable NFC in your device settings.');
         setIsReading(false);
@@ -188,32 +191,55 @@ const Verify = memo(() => {
   };
 
   return (
-    <div className="min-h-screen" style={{ backgroundColor: THEME.background, paddingTop: 'env(safe-area-inset-top)', paddingBottom: 'env(safe-area-inset-bottom)' }}>
+    <motion.div 
+      className="min-h-screen" 
+      style={{ backgroundColor: THEME.background, paddingTop: 'env(safe-area-inset-top)', paddingBottom: 'env(safe-area-inset-bottom)' }}
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ duration: 0.3 }}
+    >
       <div className="max-w-2xl mx-auto px-4 py-4 sm:py-6">
         {/* Back Button */}
-        <button
+        <motion.button
           onClick={() => navigate('/')}
-          className="flex items-center gap-2 mb-4 sm:mb-6 text-sm font-bold transition-colors"
+          className="flex items-center gap-2 mb-4 sm:mb-6 text-sm font-bold"
           style={{ color: THEME.text }}
-          onMouseEnter={(e) => e.target.style.opacity = '0.7'}
-          onMouseLeave={(e) => e.target.style.opacity = '1'}
+          whileHover={{ opacity: 0.7 }}
+          whileTap={{ scale: 0.95 }}
         >
           <FiArrowLeft size={18} style={{ width: '18px', height: '18px' }} />
           <span>Back</span>
-        </button>
+        </motion.button>
 
         {/* Header */}
-        <div className="text-center mb-6 sm:mb-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 sm:w-20 sm:h-20 mb-3 sm:mb-4" style={{ backgroundColor: THEME.accent, borderRadius: '8px' }}>
+        <motion.div 
+          className="text-center mb-6 sm:mb-8"
+          initial={{ y: -20, opacity: 0 }}
+          animate={{ y: 0, opacity: 1 }}
+          transition={{ duration: 0.4 }}
+        >
+          <motion.div 
+            className="inline-flex items-center justify-center w-16 h-16 sm:w-20 sm:h-20 mb-3 sm:mb-4" 
+            style={{ backgroundColor: THEME.accent, borderRadius: '8px' }}
+            animate={isReading ? { 
+              scale: [1, 1.1, 1],
+              rotate: [0, 5, -5, 0]
+            } : {}}
+            transition={{ 
+              duration: 2, 
+              repeat: isReading ? Infinity : 0,
+              ease: 'easeInOut'
+            }}
+          >
             <FiRadio size={32} className="text-white sm:w-10 sm:h-10" style={{ width: '32px', height: '32px' }} />
-          </div>
+          </motion.div>
           <h1 className="text-2xl sm:text-3xl font-bold mb-2" style={{ color: THEME.text, lineHeight: '1.2' }}>
             Ticket Verification
           </h1>
           <p className="text-xs sm:text-sm px-2" style={{ color: THEME.textMuted, lineHeight: '1.4' }}>
             Scan NFC tag, beacon (phone-to-phone), or enter ticket code manually
           </p>
-        </div>
+        </motion.div>
 
         {/* NFC Status Display - SHOWS ON SCREEN */}
         <div className="p-3 sm:p-4 mb-4 sm:mb-6 border-2 rounded" style={{ backgroundColor: nfcAvailable ? `${THEME.accent}15` : '#ff000015', borderColor: nfcAvailable ? THEME.accent : '#ff0000' }}>
@@ -248,28 +274,18 @@ const Verify = memo(() => {
         )}
 
         {/* Verification Card */}
-        <div className="p-4 sm:p-6 mb-4 sm:mb-6 rounded" style={{ backgroundColor: THEME.card, border: `2px solid ${THEME.border}` }}>
+        <AnimatedCard className="p-4 sm:p-6 mb-4 sm:mb-6 rounded" style={{ backgroundColor: THEME.card, border: `2px solid ${THEME.border}` }}>
           {/* NFC Read Button */}
-          <button
+          <AnimatedButton
             onClick={handleReadNFC}
             disabled={isReading}
-            className="w-full py-4 sm:py-5 text-white transition-colors font-bold text-base sm:text-lg uppercase tracking-wide disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 sm:gap-3 mb-3 sm:mb-4 rounded"
-            style={{ backgroundColor: THEME.accent, minHeight: '56px' }}
-            onMouseEnter={(e) => !isReading && !e.target.disabled && (e.target.style.backgroundColor = THEME.accentHover)}
-            onMouseLeave={(e) => !isReading && !e.target.disabled && (e.target.style.backgroundColor = THEME.accent)}
+            loading={isReading}
+            variant="primary"
+            className="w-full py-4 sm:py-5 text-base sm:text-lg mb-3 sm:mb-4 rounded"
+            icon={FiRadio}
           >
-            {isReading ? (
-              <>
-                <div className="animate-spin rounded-full h-5 w-5 sm:h-6 sm:w-6 border-t-2 border-b-2 border-white"></div>
-                <span className="text-sm sm:text-base">Reading NFC...</span>
-              </>
-            ) : (
-              <>
-                <FiRadio size={20} className="sm:w-6 sm:h-6" style={{ width: '20px', height: '20px' }} />
-                <span>Scan NFC Tag / Beacon</span>
-              </>
-            )}
-          </button>
+            {isReading ? 'Reading NFC...' : 'Scan NFC Tag / Beacon'}
+          </AnimatedButton>
           
           {nfcAvailable && (
             <p className="text-xs text-center mb-3" style={{ color: THEME.textMuted }}>
@@ -278,26 +294,25 @@ const Verify = memo(() => {
           )}
 
           {/* Manual Verification */}
-          <button
+          <AnimatedButton
             onClick={handleManualVerify}
-            className="w-full py-3 sm:py-4 border-2 transition-colors font-bold text-xs sm:text-sm uppercase rounded"
-            style={{ borderColor: THEME.border, color: THEME.text, backgroundColor: 'transparent', minHeight: '48px' }}
-            onMouseEnter={(e) => {
-              e.target.style.borderColor = THEME.accent;
-              e.target.style.backgroundColor = `${THEME.accent}10`;
-            }}
-            onMouseLeave={(e) => {
-              e.target.style.borderColor = THEME.border;
-              e.target.style.backgroundColor = 'transparent';
-            }}
+            variant="secondary"
+            className="w-full py-3 sm:py-4 text-xs sm:text-sm rounded"
           >
             Enter Code Manually
-          </button>
-        </div>
+          </AnimatedButton>
+        </AnimatedCard>
 
         {/* Error Display - SHOWS ON SCREEN */}
-        {error && (
-          <div className="p-3 sm:p-4 mb-4 sm:mb-6 border-2 rounded" style={{ backgroundColor: '#ff000015', borderColor: '#ff0000' }}>
+        <AnimatePresence>
+          {error && (
+            <motion.div
+              initial={{ opacity: 0, y: -10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              className="p-3 sm:p-4 mb-4 sm:mb-6 border-2 rounded" 
+              style={{ backgroundColor: '#ff000015', borderColor: '#ff0000' }}
+            >
             <div className="flex items-start gap-2">
               <FiXCircle style={{ color: '#ff0000', marginTop: '2px', flexShrink: 0 }} size={18} />
               <div className="flex-1">
@@ -305,18 +320,23 @@ const Verify = memo(() => {
                 <pre className="text-xs sm:text-sm leading-relaxed whitespace-pre-wrap break-words" style={{ color: '#ff0000' }}>{error}</pre>
               </div>
             </div>
-          </div>
-        )}
+            </motion.div>
+          )}
+        </AnimatePresence>
 
         {/* Verification Result */}
-        {verificationResult && (
-          <div 
-            className="p-4 sm:p-6 border-2 rounded" 
-            style={{ 
-              backgroundColor: verificationResult.valid ? `${THEME.success}15` : `${THEME.accent}15`,
-              borderColor: verificationResult.valid ? THEME.success : THEME.accent
-            }}
-          >
+        <AnimatePresence>
+          {verificationResult && (
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="p-4 sm:p-6 border-2 rounded" 
+              style={{ 
+                backgroundColor: verificationResult.valid ? `${THEME.success}15` : `${THEME.accent}15`,
+                borderColor: verificationResult.valid ? THEME.success : THEME.accent
+              }}
+            >
             <div className="flex items-start gap-3 mb-4">
               {verificationResult.valid ? (
                 <FiCheckCircle size={28} className="sm:w-8 sm:h-8 flex-shrink-0" style={{ color: THEME.success, width: '28px', height: '28px', marginTop: '2px' }} />
@@ -428,30 +448,23 @@ const Verify = memo(() => {
               </div>
             )}
 
-            <button
+            <AnimatedButton
               onClick={() => {
                 setVerificationResult(null);
                 setError(null);
                 setShowRawData(false);
               }}
-              className="mt-4 w-full py-3 sm:py-3.5 border-2 transition-colors font-bold text-xs sm:text-sm uppercase flex items-center justify-center gap-2 rounded"
-              style={{ borderColor: THEME.border, color: THEME.text, minHeight: '44px' }}
-              onMouseEnter={(e) => {
-                e.target.style.borderColor = THEME.accent;
-                e.target.style.backgroundColor = `${THEME.accent}10`;
-              }}
-              onMouseLeave={(e) => {
-                e.target.style.borderColor = THEME.border;
-                e.target.style.backgroundColor = 'transparent';
-              }}
+              variant="secondary"
+              className="mt-4 w-full py-3 sm:py-3.5 text-xs sm:text-sm rounded"
+              icon={FiRefreshCw}
             >
-              <FiRefreshCw size={16} style={{ width: '16px', height: '16px' }} />
-              <span>Scan Another Ticket</span>
-            </button>
-          </div>
-        )}
+              Scan Another Ticket
+            </AnimatedButton>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
-    </div>
+    </motion.div>
   );
 });
 

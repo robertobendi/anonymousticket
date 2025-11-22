@@ -1,10 +1,13 @@
 import { useState, useEffect, memo } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { motion, AnimatePresence } from 'framer-motion';
 import { FiArrowLeft, FiRadio, FiTrash2, FiSend, FiCreditCard, FiGlobe, FiAlertCircle } from 'react-icons/fi';
 import { useWallet, getWalletForNFC } from '@lib/wallet';
 import { writeNFC, startBeacon, stopBeacon } from '@lib/nfc-simple';
 import { checkNFC } from '@lib/nfc-simple';
 import { THEME } from '@lib/themeColors';
+import AnimatedCard from '@components/ui/AnimatedCard';
+import AnimatedButton from '@components/ui/AnimatedButton';
 
 /**
  * Wallet page - View tickets and send wallet via NFC
@@ -146,28 +149,39 @@ const Wallet = memo(() => {
   };
 
   return (
-    <div className="min-h-screen" style={{ backgroundColor: THEME.background }}>
+    <motion.div 
+      className="min-h-screen" 
+      style={{ backgroundColor: THEME.background }}
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ duration: 0.3 }}
+    >
       <div className="max-w-4xl mx-auto px-4 py-4">
         {/* Header */}
-        <div className="flex items-center justify-between mb-6">
-          <button
+        <motion.div 
+          className="flex items-center justify-between mb-6"
+          initial={{ y: -20, opacity: 0 }}
+          animate={{ y: 0, opacity: 1 }}
+          transition={{ duration: 0.4 }}
+        >
+          <motion.button
             onClick={() => navigate('/')}
-            className="flex items-center gap-2 text-sm font-bold transition-colors"
+            className="flex items-center gap-2 text-sm font-bold"
             style={{ color: THEME.text }}
-            onMouseEnter={(e) => e.target.style.opacity = '0.7'}
-            onMouseLeave={(e) => e.target.style.opacity = '1'}
+            whileHover={{ opacity: 0.7 }}
+            whileTap={{ scale: 0.95 }}
           >
             <FiArrowLeft size={18} />
             <span>Back</span>
-          </button>
+          </motion.button>
           <h1 className="text-2xl font-bold" style={{ color: THEME.text }}>
             My Wallet
           </h1>
           <div style={{ width: '60px' }}></div> {/* Spacer for centering */}
-        </div>
+        </motion.div>
 
         {/* NFC Send Section */}
-        <div className="p-4 mb-6" style={{ backgroundColor: THEME.card, border: `2px solid ${THEME.border}` }}>
+        <AnimatedCard className="p-4 mb-6" style={{ backgroundColor: THEME.card, border: `2px solid ${THEME.border}` }}>
           <div className="mb-4">
             <h2 className="text-lg font-bold mb-1" style={{ color: THEME.text }}>
               Share Tickets via NFC
@@ -178,38 +192,26 @@ const Wallet = memo(() => {
             
             {/* Two modes: Write to tag, or Beacon mode */}
             <div className="grid grid-cols-2 gap-3 mb-3">
-              <button
+              <AnimatedButton
                 onClick={handleSendWallet}
                 disabled={isSending || tickets.length === 0 || !nfcAvailable}
-                className="px-4 py-3 text-white transition-colors font-bold text-xs uppercase disabled:opacity-50 disabled:cursor-not-allowed flex flex-col items-center gap-2"
-                style={{ backgroundColor: THEME.accent }}
-                onMouseEnter={(e) => !e.target.disabled && (e.target.style.backgroundColor = THEME.accentHover)}
-                onMouseLeave={(e) => !e.target.disabled && (e.target.style.backgroundColor = THEME.accent)}
+                loading={isSending}
+                variant="primary"
+                className="px-4 py-3 text-xs flex flex-col items-center gap-2"
+                icon={FiSend}
               >
-                {isSending ? (
-                  <>
-                    <div className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-white"></div>
-                    <span>Writing...</span>
-                  </>
-                ) : (
-                  <>
-                    <FiSend size={18} />
-                    <span>Write to Tag</span>
-                  </>
-                )}
-              </button>
+                {isSending ? 'Writing...' : 'Write to Tag'}
+              </AnimatedButton>
               
-              <button
+              <AnimatedButton
                 onClick={handleStartBeacon}
                 disabled={isBeaconActive || tickets.length === 0 || !nfcAvailable}
-                className="px-4 py-3 text-white transition-colors font-bold text-xs uppercase disabled:opacity-50 disabled:cursor-not-allowed flex flex-col items-center gap-2"
-                style={{ backgroundColor: isBeaconActive ? THEME.success : THEME.accent }}
-                onMouseEnter={(e) => !e.target.disabled && !isBeaconActive && (e.target.style.backgroundColor = THEME.accentHover)}
-                onMouseLeave={(e) => !e.target.disabled && !isBeaconActive && (e.target.style.backgroundColor = isBeaconActive ? THEME.success : THEME.accent)}
+                variant={isBeaconActive ? 'success' : 'primary'}
+                className="px-4 py-3 text-xs flex flex-col items-center gap-2"
+                icon={FiRadio}
               >
-                <FiRadio size={18} />
-                <span>{isBeaconActive ? 'Beacon Active' : 'Start Beacon'}</span>
-              </button>
+                {isBeaconActive ? 'Beacon Active' : 'Start Beacon'}
+              </AnimatedButton>
             </div>
           </div>
 
@@ -265,11 +267,12 @@ const Wallet = memo(() => {
               </div>
             </>
           )}
-        </div>
+        </AnimatedCard>
 
         {/* Tickets List */}
-        {tickets.length === 0 ? (
-          <div className="p-8 text-center" style={{ backgroundColor: THEME.card, border: `2px solid ${THEME.border}` }}>
+        <AnimatePresence mode="wait">
+          {tickets.length === 0 ? (
+            <AnimatedCard className="p-8 text-center" style={{ backgroundColor: THEME.card, border: `2px solid ${THEME.border}` }}>
             <FiCreditCard size={48} style={{ color: THEME.textMuted, margin: '0 auto 16px' }} />
             <p className="text-sm font-bold mb-2" style={{ color: THEME.text }}>
               No tickets in wallet
@@ -277,24 +280,24 @@ const Wallet = memo(() => {
             <p className="text-xs" style={{ color: THEME.textMuted }}>
               Purchase tickets to add them to your wallet
             </p>
-            <button
+            <AnimatedButton
               onClick={() => navigate('/')}
-              className="mt-4 px-6 py-2 text-white transition-colors font-bold text-sm"
-              style={{ backgroundColor: THEME.accent }}
-              onMouseEnter={(e) => e.target.style.backgroundColor = THEME.accentHover}
-              onMouseLeave={(e) => e.target.style.backgroundColor = THEME.accent}
+              variant="primary"
+              className="mt-4 px-6 py-2 text-sm"
             >
               Buy Tickets
-            </button>
-          </div>
-        ) : (
-          <div className="space-y-4">
-            {tickets.map((ticket) => (
-              <div
-                key={ticket.id}
-                className="p-4"
-                style={{ backgroundColor: THEME.card, border: `2px solid ${THEME.border}` }}
-              >
+            </AnimatedButton>
+            </AnimatedCard>
+          ) : (
+            <div className="space-y-4">
+              {tickets.map((ticket, index) => (
+                <AnimatedCard
+                  key={ticket.id}
+                  delay={index * 0.1}
+                  className="p-4"
+                  style={{ backgroundColor: THEME.card, border: `2px solid ${THEME.border}` }}
+                  whileHover={{ scale: 1.01 }}
+                >
                 <div className="flex items-start justify-between gap-4">
                   <div className="flex-1">
                     {ticket.type === 'pass' ? (
@@ -367,23 +370,24 @@ const Wallet = memo(() => {
                       </div>
                     </div>
                   </div>
-                  <button
+                  <motion.button
                     onClick={() => removeTicket(ticket.id)}
-                    className="p-2 transition-colors"
+                    className="p-2"
                     style={{ color: THEME.accent }}
-                    onMouseEnter={(e) => e.target.style.opacity = '0.7'}
-                    onMouseLeave={(e) => e.target.style.opacity = '1'}
+                    whileHover={{ opacity: 0.7, scale: 1.1 }}
+                    whileTap={{ scale: 0.9 }}
                     aria-label="Remove ticket"
                   >
                     <FiTrash2 size={20} />
-                  </button>
+                  </motion.button>
                 </div>
-              </div>
-            ))}
-          </div>
-        )}
+                </AnimatedCard>
+              ))}
+            </div>
+          )}
+        </AnimatePresence>
       </div>
-    </div>
+    </motion.div>
   );
 });
 

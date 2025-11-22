@@ -1,10 +1,13 @@
 import { useState, memo } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { motion, AnimatePresence } from 'framer-motion';
 import { FiMapPin, FiCalendar, FiUsers, FiSearch, FiRepeat, FiAlertCircle, FiPrinter, FiShield, FiCreditCard, FiGlobe, FiRadio } from 'react-icons/fi';
 import { getConnections, transformConnection, getPopularStations, searchStations } from '@lib/api';
 import { generateAnonymousTicket, generateAnonymousPass, formatTicketForPrint, generateQRCodeData } from '@lib/ticketGenerator';
 import { addTicketToWallet } from '@lib/wallet';
 import { THEME } from '@lib/themeColors';
+import AnimatedCard from '@components/ui/AnimatedCard';
+import AnimatedButton from '@components/ui/AnimatedButton';
 
 const SWISS_STATIONS = getPopularStations();
 
@@ -178,9 +181,21 @@ const Home = memo(() => {
   };
 
   return (
-    <div className="min-h-screen" style={{ backgroundColor: THEME.background }}>
+    <motion.div 
+      className="min-h-screen" 
+      style={{ backgroundColor: THEME.background }}
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ duration: 0.3 }}
+    >
       {/* Hero Section - Anonymous Ticket Focus */}
-      <section className="text-white py-6" style={{ backgroundColor: THEME.accent }}>
+      <motion.section 
+        className="text-white py-6" 
+        style={{ backgroundColor: THEME.accent }}
+        initial={{ y: -20, opacity: 0 }}
+        animate={{ y: 0, opacity: 1 }}
+        transition={{ duration: 0.4 }}
+      >
         <div className="max-w-6xl mx-auto px-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
@@ -193,26 +208,26 @@ const Home = memo(() => {
               </div>
             </div>
             <div className="flex items-center gap-3">
-              <button
+              <motion.button
                 onClick={() => navigate('/wallet')}
-                className="flex items-center gap-2 px-3 py-2 text-white transition-colors font-bold text-xs uppercase"
+                className="flex items-center gap-2 px-3 py-2 text-white font-bold text-xs uppercase"
                 style={{ backgroundColor: 'rgba(255,255,255,0.2)' }}
-                onMouseEnter={(e) => e.target.style.backgroundColor = 'rgba(255,255,255,0.3)'}
-                onMouseLeave={(e) => e.target.style.backgroundColor = 'rgba(255,255,255,0.2)'}
+                whileHover={{ backgroundColor: 'rgba(255,255,255,0.3)' }}
+                whileTap={{ scale: 0.95 }}
               >
                 <FiCreditCard size={16} />
                 Wallet
-              </button>
-              <button
+              </motion.button>
+              <motion.button
                 onClick={() => navigate('/verify')}
-                className="flex items-center gap-2 px-3 py-2 text-white transition-colors font-bold text-xs uppercase"
+                className="flex items-center gap-2 px-3 py-2 text-white font-bold text-xs uppercase"
                 style={{ backgroundColor: 'rgba(255,255,255,0.2)' }}
-                onMouseEnter={(e) => e.target.style.backgroundColor = 'rgba(255,255,255,0.3)'}
-                onMouseLeave={(e) => e.target.style.backgroundColor = 'rgba(255,255,255,0.2)'}
+                whileHover={{ backgroundColor: 'rgba(255,255,255,0.3)' }}
+                whileTap={{ scale: 0.95 }}
               >
                 <FiRadio size={16} />
                 Verify
-              </button>
+              </motion.button>
               <div className="flex items-center gap-2 px-3 py-2" style={{ backgroundColor: 'rgba(255,255,255,0.2)' }}>
                 <FiShield size={18} />
                 <span className="text-xs font-bold">100% Anonymous</span>
@@ -220,68 +235,54 @@ const Home = memo(() => {
             </div>
           </div>
         </div>
-      </section>
+      </motion.section>
 
       {/* Booking Form - Mobile First Design */}
-      <section className="max-w-6xl mx-auto px-4 py-6">
-        <div className="p-4 mb-6" style={{ backgroundColor: THEME.card }}>
-          <form onSubmit={handleSearch} className="space-y-6">
+      <section className="max-w-6xl mx-auto px-4 sm:px-6 py-4 sm:py-6">
+        <AnimatedCard className="p-4 sm:p-6 mb-4 sm:mb-6" style={{ backgroundColor: THEME.card }}>
+          <form onSubmit={handleSearch} className="space-y-4 sm:space-y-6">
             {/* Ticket Type Selector */}
             <div>
               <label className="block text-sm font-bold mb-3" style={{ color: THEME.text }}>
                 Ticket Type
               </label>
-              <div className="grid grid-cols-2 gap-3">
-                <button
+              <div className="grid grid-cols-2 gap-2 sm:gap-3">
+                <motion.button
                   type="button"
                   onClick={() => handleInputChange('ticketType', 'single')}
-                  className="p-4 border-2 transition-all flex items-center justify-center gap-2 font-bold text-sm uppercase"
+                  className="p-3 sm:p-4 border-2 flex items-center justify-center gap-2 font-bold text-xs sm:text-sm uppercase min-h-[48px]"
                   style={{
                     borderColor: formData.ticketType === 'single' ? THEME.accent : THEME.border,
                     backgroundColor: formData.ticketType === 'single' ? `${THEME.accent}20` : THEME.surface,
                     color: THEME.text
                   }}
-                  onMouseEnter={(e) => {
-                    if (formData.ticketType !== 'single') {
-                      e.target.style.borderColor = THEME.accent;
-                      e.target.style.backgroundColor = `${THEME.accent}10`;
-                    }
-                  }}
-                  onMouseLeave={(e) => {
-                    if (formData.ticketType !== 'single') {
-                      e.target.style.borderColor = THEME.border;
-                      e.target.style.backgroundColor = THEME.surface;
-                    }
-                  }}
+                  whileHover={formData.ticketType !== 'single' ? { 
+                    borderColor: THEME.accent,
+                    backgroundColor: `${THEME.accent}10`
+                  } : {}}
+                  whileTap={{ scale: 0.98 }}
                 >
                   <FiCreditCard size={18} />
                   Single Ticket
-                </button>
-                <button
+                </motion.button>
+                <motion.button
                   type="button"
                   onClick={() => handleInputChange('ticketType', 'pass')}
-                  className="p-4 border-2 transition-all flex items-center justify-center gap-2 font-bold text-sm uppercase"
+                  className="p-3 sm:p-4 border-2 flex items-center justify-center gap-2 font-bold text-xs sm:text-sm uppercase min-h-[48px]"
                   style={{
                     borderColor: formData.ticketType === 'pass' ? THEME.accent : THEME.border,
                     backgroundColor: formData.ticketType === 'pass' ? `${THEME.accent}20` : THEME.surface,
                     color: THEME.text
                   }}
-                  onMouseEnter={(e) => {
-                    if (formData.ticketType !== 'pass') {
-                      e.target.style.borderColor = THEME.accent;
-                      e.target.style.backgroundColor = `${THEME.accent}10`;
-                    }
-                  }}
-                  onMouseLeave={(e) => {
-                    if (formData.ticketType !== 'pass') {
-                      e.target.style.borderColor = THEME.border;
-                      e.target.style.backgroundColor = THEME.surface;
-                    }
-                  }}
+                  whileHover={formData.ticketType !== 'pass' ? { 
+                    borderColor: THEME.accent,
+                    backgroundColor: `${THEME.accent}10`
+                  } : {}}
+                  whileTap={{ scale: 0.98 }}
                 >
                   <FiGlobe size={18} />
                   Pass
-                </button>
+                </motion.button>
               </div>
             </div>
 
@@ -291,18 +292,19 @@ const Home = memo(() => {
                 <label className="block text-sm font-bold mb-3" style={{ color: THEME.text }}>
                   Pass Type
                 </label>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-2 sm:gap-3">
                   {[
                     { value: 'daily', label: 'Daily', price: 75 },
                     { value: 'weekly', label: 'Weekly', price: 200 },
                     { value: 'monthly', label: 'Monthly', price: 600 },
                     { value: 'countrywide', label: 'Country-wide', price: 300 }
                   ].map((pass) => (
-                    <button
+                    <motion.button
                       key={pass.value}
                       type="button"
                       onClick={() => handleInputChange('passType', pass.value)}
-                      className="p-4 border-2 transition-all text-center"
+                      className="p-3 sm:p-4 border-2 text-center min-h-[48px]"
+                      whileTap={{ scale: 0.98 }}
                       style={{
                         borderColor: formData.passType === pass.value ? THEME.accent : THEME.border,
                         backgroundColor: formData.passType === pass.value ? `${THEME.accent}20` : THEME.surface,
@@ -321,11 +323,11 @@ const Home = memo(() => {
                         }
                       }}
                     >
-                      <div className="font-bold text-sm mb-1">{pass.label}</div>
+                      <div className="font-bold text-xs sm:text-sm mb-1">{pass.label}</div>
                       <div className="text-xs" style={{ color: THEME.textMuted }}>
                         CHF {pass.price}
                       </div>
-                    </button>
+                    </motion.button>
                   ))}
                 </div>
               </div>
@@ -333,7 +335,7 @@ const Home = memo(() => {
 
             {/* Origin and Destination (only for single tickets or non-countrywide passes) */}
             {(formData.ticketType === 'single' || (formData.ticketType === 'pass' && formData.passType !== 'countrywide')) && (
-            <div className="grid md:grid-cols-2 gap-4">
+            <div className="grid md:grid-cols-2 gap-3 sm:gap-4">
               <div className="relative">
                 <label className="block text-sm font-bold mb-2" style={{ color: THEME.text }}>
                   From
@@ -417,7 +419,7 @@ const Home = memo(() => {
             )}
 
             {/* Date and Passengers */}
-            <div className="grid md:grid-cols-3 gap-4">
+            <div className="grid md:grid-cols-3 gap-3 sm:gap-4">
               <div>
                 <label className="block text-sm font-bold mb-2" style={{ color: THEME.text }}>
                   Date
@@ -427,8 +429,8 @@ const Home = memo(() => {
                   value={formData.date}
                   onChange={(e) => handleInputChange('date', e.target.value)}
                   min={new Date().toISOString().split('T')[0]}
-                  className="w-full px-4 py-3 border-2 focus:outline-none font-normal"
-                  style={{ borderColor: THEME.border, backgroundColor: THEME.card, color: THEME.text }}
+                  className="w-full px-4 py-3 sm:py-4 border-2 focus:outline-none font-normal text-base"
+                  style={{ borderColor: THEME.border, backgroundColor: THEME.card, color: THEME.text, minHeight: '48px' }}
                   onFocus={(e) => e.target.style.borderColor = THEME.accent}
                   onBlur={(e) => e.target.style.borderColor = THEME.border}
                   required
@@ -442,8 +444,8 @@ const Home = memo(() => {
                 <select
                   value={formData.passengers}
                   onChange={(e) => handleInputChange('passengers', parseInt(e.target.value))}
-                  className="w-full px-4 py-3 border-2 focus:outline-none font-normal"
-                  style={{ borderColor: THEME.border, backgroundColor: THEME.card, color: THEME.text }}
+                  className="w-full px-4 py-3 sm:py-4 border-2 focus:outline-none font-normal text-base"
+                  style={{ borderColor: THEME.border, backgroundColor: THEME.card, color: THEME.text, minHeight: '48px' }}
                   onFocus={(e) => e.target.style.borderColor = THEME.accent}
                   onBlur={(e) => e.target.style.borderColor = THEME.border}
                 >
@@ -486,57 +488,57 @@ const Home = memo(() => {
             )}
 
             {/* Search Button - SBB Mobile Style */}
-            <button
+            <AnimatedButton
               type="submit"
               disabled={isSearching}
-              className="w-full px-6 py-4 text-white transition-colors font-bold disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 text-base uppercase tracking-wide"
-              style={{ backgroundColor: THEME.accent }}
-              onMouseEnter={(e) => e.target.style.backgroundColor = THEME.accentHover}
-              onMouseLeave={(e) => e.target.style.backgroundColor = THEME.accent}
+              loading={isSearching}
+              variant="primary"
+              className="w-full px-6 py-4 sm:py-5 text-base sm:text-lg font-bold"
+              icon={formData.ticketType === 'pass' ? FiCreditCard : FiSearch}
             >
-              {isSearching ? (
-                <>
-                  <div className="animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-white"></div>
-                  Searching...
-                </>
-              ) : formData.ticketType === 'pass' ? (
-                <>
-                  <FiCreditCard size={20} />
-                  Purchase Pass
-                </>
-              ) : (
-                <>
-                  <FiSearch size={20} />
-                  Search Connections
-                </>
-              )}
-            </button>
+              {isSearching ? 'Searching...' : formData.ticketType === 'pass' ? 'Purchase Pass' : 'Search Connections'}
+            </AnimatedButton>
 
             {/* Error Message */}
-            {searchError && (
-              <div className="flex items-center gap-2 p-3 border-2" style={{ backgroundColor: `${THEME.accent}15`, borderColor: THEME.accent }}>
-                <FiAlertCircle style={{ color: THEME.accent }} />
-                <span className="text-sm" style={{ color: THEME.accent }}>{searchError}</span>
-              </div>
-            )}
+            <AnimatePresence>
+              {searchError && (
+                <motion.div
+                  initial={{ opacity: 0, y: -10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -10 }}
+                  className="flex items-center gap-2 p-3 border-2" 
+                  style={{ backgroundColor: `${THEME.accent}15`, borderColor: THEME.accent }}
+                >
+                  <FiAlertCircle style={{ color: THEME.accent }} />
+                  <span className="text-sm" style={{ color: THEME.accent }}>{searchError}</span>
+                </motion.div>
+              )}
+            </AnimatePresence>
           </form>
-        </div>
+        </AnimatedCard>
 
         {/* Search Results - SBB Mobile Style */}
-        {searchResults && (
-          <div className="p-4" style={{ backgroundColor: THEME.card }}>
-            <h2 className="text-lg font-bold mb-4" style={{ color: THEME.text }}>
-              Connections: {formData.origin} → {formData.destination}
-            </h2>
-            <div className="space-y-2">
-              {searchResults.map((trip) => (
-                <div
-                  key={trip.id}
-                  className="p-4 transition-colors"
-                  style={{ borderLeft: `4px solid ${THEME.accent}`, backgroundColor: THEME.card }}
-                  onMouseEnter={(e) => e.target.style.backgroundColor = THEME.surfaceHover}
-                  onMouseLeave={(e) => e.target.style.backgroundColor = THEME.card}
-                >
+        <AnimatePresence>
+          {searchResults && (
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+              className="p-4" 
+              style={{ backgroundColor: THEME.card }}
+            >
+              <h2 className="text-lg font-bold mb-4" style={{ color: THEME.text }}>
+                Connections: {formData.origin} → {formData.destination}
+              </h2>
+              <div className="space-y-2">
+                {searchResults.map((trip, index) => (
+                  <AnimatedCard
+                    key={trip.id}
+                    delay={index * 0.1}
+                    className="p-4"
+                    style={{ borderLeft: `4px solid ${THEME.accent}`, backgroundColor: THEME.card }}
+                    whileHover={{ backgroundColor: THEME.surfaceHover }}
+                  >
                   <div className="flex flex-col gap-4">
                     {/* Time and Route Info */}
                     <div className="flex items-center justify-between">
@@ -572,26 +574,32 @@ const Home = memo(() => {
                           {trip.changes === 0 ? 'Direct' : `${trip.changes} change${trip.changes > 1 ? 's' : ''}`}
                         </span>
                       </div>
-                      <button
+                      <AnimatedButton
                         onClick={() => handleBook(trip)}
-                        className="px-4 py-2 text-white transition-colors font-bold text-sm uppercase"
-                        style={{ backgroundColor: THEME.accent }}
-                        onMouseEnter={(e) => e.target.style.backgroundColor = THEME.accentHover}
-                        onMouseLeave={(e) => e.target.style.backgroundColor = THEME.accent}
+                        variant="primary"
+                        className="px-4 py-2 text-sm"
                       >
                         Book
-                      </button>
+                      </AnimatedButton>
                     </div>
                   </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
+                  </AnimatedCard>
+                ))}
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
         {/* Purchased Anonymous Ticket */}
-        {purchasedTicket && (
-          <div className="p-4 mb-6" style={{ backgroundColor: THEME.card, border: `2px solid ${THEME.accent}` }}>
+        <AnimatePresence>
+          {purchasedTicket && (
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="p-4 mb-6" 
+              style={{ backgroundColor: THEME.card, border: `2px solid ${THEME.accent}` }}
+            >
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-2">
                 <FiShield style={{ color: THEME.accent }} />
@@ -599,16 +607,14 @@ const Home = memo(() => {
                   Your Anonymous Ticket
                 </h2>
               </div>
-              <button
+              <AnimatedButton
                 onClick={handlePrintTicket}
-                className="flex items-center gap-2 px-4 py-2 text-white transition-colors font-bold text-sm"
-                style={{ backgroundColor: THEME.accent }}
-                onMouseEnter={(e) => e.target.style.backgroundColor = THEME.accentHover}
-                onMouseLeave={(e) => e.target.style.backgroundColor = THEME.accent}
+                variant="primary"
+                className="px-4 py-2 text-sm"
+                icon={FiPrinter}
               >
-                <FiPrinter size={16} />
                 Print Ticket
-              </button>
+              </AnimatedButton>
             </div>
 
             <div className="space-y-3">
@@ -711,10 +717,11 @@ const Home = memo(() => {
                 </div>
               </div>
             </div>
-          </div>
-        )}
+            </motion.div>
+          )}
+        </AnimatePresence>
       </section>
-    </div>
+    </motion.div>
   );
 });
 
