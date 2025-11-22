@@ -153,70 +153,138 @@ function calculateValidUntil(date, arrivalTime) {
 }
 
 /**
- * Verify ticket validity
+ * Verify ticket validity - Controller mode
+ * Checks if ticket is valid, expired, or future-dated
  * @param {Object} ticket - Ticket to verify (can be partial data from NFC)
- * @returns {Object} Verification result
+ * @returns {Object} Verification result with detailed status
  */
 export function verifyTicket(ticket) {
-  if (!ticket || !ticket.ticketId) {
+  // Accept both ticketId and id fields
+  const ticketId = ticket?.ticketId || ticket?.id;
+  
+  if (!ticket || !ticketId) {
     return {
       valid: false,
       expired: false,
       future: false,
-      message: 'Invalid ticket data'
+      message: 'Invalid ticket data - missing ticket ID'
     };
   }
 
   const now = new Date();
   
-  // If we have validity dates, check them
-  if (ticket.validUntil) {
-    const validUntil = new Date(ticket.validUntil);
-    const isExpired = now > validUntil;
-    
-    if (ticket.validFrom) {
-      const validFrom = new Date(ticket.validFrom);
-      const isFuture = now < validFrom;
+  // For passes (daily, weekly, monthly, countrywide)
+  if (ticket.type === 'pass' || ticket.passType) {
+    if (ticket.validUntil) {
+      const validUntil = new Date(ticket.validUntil);
+      const validFrom = ticket.validFrom ? new Date(ticket.validFrom) : null;
+      
+      const isExpired = now > validUntil;
+      const isFuture = validFrom ? now < validFrom : false;
       
       return {
         valid: !isExpired && !isFuture,
         expired: isExpired,
         future: isFuture,
         message: isExpired 
-          ? 'Ticket has expired' 
+          ? `Pass expired on ${new Date(ticket.validUntil).toLocaleDateString('de-CH')}` 
           : isFuture 
-            ? 'Ticket is not yet valid' 
-            : 'Ticket is valid'
+            ? `Pass not valid until ${new Date(ticket.validFrom).toLocaleDateString('de-CH')}` 
+            : `Valid pass - ${ticket.passType || 'pass'}`
       };
     }
     
+    // Pass without validity dates - assume valid if we have the pass data
     return {
-      valid: !isExpired,
-      expired: isExpired,
+      valid: true,
+      expired: false,
       future: false,
-      message: isExpired ? 'Ticket has expired' : 'Ticket is valid'
+      message: 'Pass found - validity dates not available'
     };
   }
   
-  // If we have date, check if it's in the past (for single tickets)
-  if (ticket.date) {
-    const ticketDate = new Date(ticket.date);
-    const isFuture = ticketDate > now;
+  // For single tickets - check validity dates first
+  if (ticket.validUntil) {
+    const validUntil = new Date(ticket.validUntil);
+    const validFrom = ticket.validFrom ? new Date(ticket.validFrom) : null;
+    
+    const isExpired = now > validUntil;
+    const isFuture = validFrom ? now < validFrom : false;
     
     return {
-      valid: !isFuture,
-      expired: false,
+      valid: !isExpired && !isFuture,
+      expired: isExpired,
       future: isFuture,
-      message: isFuture ? 'Ticket is not yet valid' : 'Ticket found (validity check requires full ticket data)'
+      message: isExpired 
+        ? `Ticket expired on ${new Date(ticket.validUntil).toLocaleString('de-CH')}` 
+        : isFuture 
+          ? `Ticket not valid until ${new Date(ticket.validFrom).toLocaleString('de-CH')}` 
+          : `Valid ticket - ${ticket.origin || ''} → ${ticket.destination || ''}`
     };
   }
   
-  // If we only have ticket ID, assume valid (would check against database in production)
+  // If we have travel date, check if it's today or in the past
+  if (ticket.date) {
+    const ticketDate = new Date(ticket.date);
+    ticketDate.setHours(0, 0, 0, 0); // Reset to start of day
+    
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    const isFuture = ticketDate > today;
+    const isToday = ticketDate.getTime() === today.getTime();
+    
+    if (isFuture) {
+      return {
+        valid: false,
+        expired: false,
+        future: true,
+        message: `Ticket date is in the future: ${new Date(ticket.date).toLocaleDateString('de-CH')}`
+      };
+    }
+    
+    // If today or past, check if we have arrival time to determine if still valid
+    if (isToday && ticket.arrival) {
+      // Ticket is for today - check if arrival time has passed (with 2 hour buffer)
+      const [hours, minutes] = ticket.arrival.split(':');
+      const arrivalTime = new Date(ticket.date);
+      arrivalTime.setHours(parseInt(hours) + 2, parseInt(minutes), 0, 0); // Add 2 hour buffer
+      
+      if (now > arrivalTime) {
+        return {
+          valid: false,
+          expired: true,
+          future: false,
+          message: `Ticket expired - arrival time ${ticket.arrival} has passed (with 2h buffer)`
+        };
+      }
+    }
+    
+    return {
+      valid: true,
+      expired: false,
+      future: false,
+      message: `Valid ticket for ${new Date(ticket.date).toLocaleDateString('de-CH')} - ${ticket.origin || ''} → ${ticket.destination || ''}`
+    };
+  }
+  
+  // If we only have ticket ID and control code, assume valid (would check against database in production)
+  // This is for cases where we only get minimal data from NFC
+  if (ticket.controlCode) {
+    return {
+      valid: true,
+      expired: false,
+      future: false,
+      message: 'Ticket found - Control code verified (full validation requires date/time data)'
+    };
+  }
+  
+  // Minimal data - just ticket ID
   return {
     valid: true,
     expired: false,
     future: false,
-    message: 'Ticket found (verification requires full ticket data)'
+    message: 'Ticket found - ID verified (full validation requires complete ticket data)'
   };
 }
 

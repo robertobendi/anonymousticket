@@ -47,6 +47,7 @@ const Wallet = memo(() => {
         setIsBeaconActive(false);
         setSendSuccess(false);
         setSendError(null);
+        console.log('Beacon stopped');
       } catch (error) {
         console.error('Error stopping beacon:', error);
       }
@@ -68,10 +69,14 @@ const Wallet = memo(() => {
       const walletData = getWalletForNFC();
       const walletJson = JSON.stringify(walletData);
       
+      console.log('Starting beacon mode with wallet data:', walletData.ticketCount, 'tickets');
       await startBeacon(walletJson);
       setIsBeaconActive(true);
       setSendSuccess(true);
       setIsSending(false);
+      console.log('✓ Beacon mode active - controller can scan this phone');
+      // Note: Success here means "ready to share", not "shared successfully"
+      // The actual P2P exchange happens when phones touch
     } catch (error) {
       console.error('Beacon error:', error);
       setSendError(error.message || 'Failed to start beacon');
@@ -223,10 +228,10 @@ const Wallet = memo(() => {
             </div>
           )}
 
-          {sendSuccess && (
+          {sendSuccess && !isBeaconActive && (
             <div className="p-3 mb-3" style={{ backgroundColor: `${THEME.success}15`, borderLeft: `4px solid ${THEME.success}` }}>
               <p className="text-xs" style={{ color: THEME.success }}>
-                Wallet sent successfully! Hold your device near the receiver.
+                Write mode ready! Hold device near NFC tag or receiving phone.
               </p>
             </div>
           )}
@@ -234,10 +239,19 @@ const Wallet = memo(() => {
           {isBeaconActive ? (
             <div className="p-3 mb-3" style={{ backgroundColor: `${THEME.success}15`, borderLeft: `4px solid ${THEME.success}` }}>
               <p className="text-xs font-bold mb-1" style={{ color: THEME.success }}>
-                ✓ Beacon Active - Controller can scan this phone
+                ✓✓✓ SHARE MODE ACTIVE ✓✓✓
               </p>
+              <p className="text-xs mb-2" style={{ color: THEME.textMuted }}>
+                <strong>Instructions for controller:</strong>
+              </p>
+              <ol className="text-xs ml-4 list-decimal mb-2 space-y-1" style={{ color: THEME.textMuted }}>
+                <li>Controller: Go to Verify page</li>
+                <li>Controller: Click "Scan NFC Tag / Beacon"</li>
+                <li>Hold phones back-to-back (NFC areas touching)</li>
+                <li>Controller will receive your wallet data</li>
+              </ol>
               <p className="text-xs" style={{ color: THEME.textMuted }}>
-                Hold this phone near the controller's device. Click "Start Beacon" again to stop.
+                Click "Start Beacon" again to stop sharing.
               </p>
             </div>
           ) : (

@@ -47,6 +47,7 @@ export async function startReading() {
   try {
     window.NFC.enableScan();
     console.log('✓ NFC scanning enabled - listening for wallet data...');
+    console.log('Hold device near NFC tag or phone with beacon active');
   } catch (error) {
     console.error('Error enabling NFC scan:', error);
     throw error;
@@ -56,13 +57,18 @@ export async function startReading() {
   return new Promise((resolve, reject) => {
     let resolved = false;
     let attempts = 0;
-    const maxAttempts = 3; // Allow multiple reads
+    const maxAttempts = 10; // Allow more attempts for beacon mode
 
     const handler = (event) => {
       const tagId = event.detail?.id || '';
       const tagData = event.detail?.data || '';
 
-      console.log(`NFC read attempt ${attempts + 1}:`, { id: tagId, data: tagData?.substring(0, 50) + '...' });
+      attempts++;
+      console.log(`NFC read attempt ${attempts}:`, { 
+        id: tagId, 
+        dataLength: tagData?.length || 0,
+        preview: tagData?.substring(0, 100) + '...' 
+      });
 
       // Check if this is wallet data
       if (tagData && (tagData.includes('"wallet"') || tagData.includes('"tickets"'))) {
@@ -80,15 +86,14 @@ export async function startReading() {
           // Ignore
         }
 
-        console.log('✓ Wallet data received!');
+        console.log('✓✓✓ Wallet data received! ✓✓✓');
         resolve({
           id: tagId,
           data: tagData
         });
-      } else {
-        // Not wallet data, keep listening
-        attempts++;
-        console.log(`Not wallet data (attempt ${attempts}/${maxAttempts}), continuing to listen...`);
+      } else if (tagData && tagData.length > 0) {
+        // Got some data but not wallet - log it and keep listening
+        console.log(`Attempt ${attempts}: Got data but not wallet format, continuing...`);
         
         if (attempts >= maxAttempts) {
           // After max attempts, reject if no wallet data
@@ -102,15 +107,18 @@ export async function startReading() {
             } catch (e) {
               // Ignore
             }
-            reject(new Error('No wallet data received. Make sure the sending phone has clicked "Send Wallet" and both phones are touching.'));
+            reject(new Error(`No wallet data received after ${maxAttempts} attempts. Make sure: 1) Sending phone clicked "Start Beacon", 2) Both phones unlocked, 3) Hold phones back-to-back.`));
           }
         }
+      } else {
+        // No data yet, keep listening
+        console.log(`Attempt ${attempts}: No data yet, continuing to listen...`);
       }
     };
 
     window.addEventListener('nfctag', handler);
 
-    // Timeout after 60 seconds (longer for device-to-device)
+    // Timeout after 90 seconds (longer for beacon mode)
     setTimeout(() => {
       if (resolved) return;
       resolved = true;
@@ -125,8 +133,8 @@ export async function startReading() {
         // Ignore
       }
 
-      reject(new Error('NFC read timeout. Make sure: 1) Sending phone clicked "Send Wallet", 2) Both phones are unlocked, 3) Hold phones back-to-back.'));
-    }, 60000);
+      reject(new Error('NFC read timeout. Make sure: 1) Sending phone clicked "Start Beacon", 2) Both phones unlocked, 3) Hold phones back-to-back, 4) Try "Write to Tag" mode with a physical NFC tag.'));
+    }, 90000);
   });
 }
 
@@ -221,6 +229,9 @@ export async function writeNFC(data) {
  * Start beacon mode - phone acts like an NFC tag
  * Controller can scan this phone to read wallet data
  * More reliable than device-to-device writing
+ * 
+ * NOTE: This doesn't wait for actual P2P exchange - it just enables the mode
+ * The success message means "ready to share", not "shared successfully"
  */
 export async function startBeacon(data) {
   if (!isAndroid || !window.NFC) {
@@ -237,6 +248,8 @@ export async function startBeacon(data) {
       throw new Error(result.error || 'Failed to start NFC beacon');
     }
     console.log('NFC beacon mode enabled:', result.message);
+    console.log('⚠️ Beacon is ACTIVE - waiting for controller to scan...');
+    console.log('⚠️ This does NOT mean data was sent - it means phone is ready to share');
     return { success: true, message: result.message };
   } catch (error) {
     console.error('Error starting NFC beacon:', error);

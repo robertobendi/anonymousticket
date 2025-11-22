@@ -17,6 +17,7 @@ const Verify = memo(() => {
   const [error, setError] = useState(null);
   const [nfcAvailable, setNfcAvailable] = useState(false);
   const [showRawData, setShowRawData] = useState(false);
+  const [isContinuousMode, setIsContinuousMode] = useState(false);
 
   useEffect(() => {
     // Check NFC availability - don't request permission on load to avoid blocking
@@ -67,29 +68,57 @@ const Verify = memo(() => {
 
       // Start reading NFC - keep trying until we get wallet data
       console.log('Starting NFC read - waiting for wallet data...');
-      const nfcData = await startReading();
-      console.log('NFC read completed:', nfcData);
+      console.log('Hold phone near NFC tag or another phone with beacon active');
+      
+      // For continuous mode, keep reading until we get data
+      let nfcData;
+      if (isContinuousMode) {
+        // Keep reading in a loop
+        while (true) {
+          try {
+            nfcData = await startReading();
+            console.log('NFC read completed:', nfcData);
+            break; // Got data, exit loop
+          } catch (error) {
+            console.log('Read attempt failed, continuing...', error.message);
+            // Continue trying
+            await new Promise(resolve => setTimeout(resolve, 1000));
+          }
+        }
+      } else {
+        nfcData = await startReading();
+        console.log('NFC read completed:', nfcData);
+      }
       
       // Extract ticket data - simple format returns {id, data}
       const tagId = nfcData.id || '';
       const ticketDataString = nfcData.data || tagId;
 
       // Parse ticket data
+      console.log('Parsing NFC data:', ticketDataString?.substring(0, 200));
       const parsedData = parseNFCTicketData(ticketDataString) || parseQRCodeData(ticketDataString);
+      console.log('Parsed data:', parsedData);
       
-      // Check if this is a wallet (contains tickets array)
+      // Check if this is a wallet (contains tickets array) - from beacon mode
       if (parsedData && parsedData.wallet && Array.isArray(parsedData.tickets)) {
+        console.log('Wallet detected with', parsedData.tickets.length, 'tickets');
         // Navigate to ReceivedTickets page with wallet data
         navigate('/received', { state: { walletData: parsedData } });
         setIsReading(false);
         return;
       }
       
+      // Check if parsed data is valid
       if (!parsedData || (!parsedData.ticketId && !parsedData.id)) {
+        console.warn('Invalid ticket format - no ticket ID found');
         setVerificationResult({
           valid: false,
-          message: 'Invalid ticket format - raw NFC data available below',
+          message: 'Invalid ticket format - no ticket ID found. Raw NFC data available below.',
           ticketId: null,
+          controlCode: null,
+          origin: null,
+          destination: null,
+          date: null,
           rawTagId: tagId,
           rawData: ticketDataString,
         });
@@ -98,9 +127,15 @@ const Verify = memo(() => {
         return;
       }
 
-      // Verify ticket (in real app, this would check against database)
+      // Verify ticket - Controller validation
       const ticketId = parsedData.ticketId || parsedData.id;
-      const verification = verifyTicket(parsedData);
+      console.log('Verifying ticket:', ticketId);
+      const verification = verifyTicket({
+        ...parsedData,
+        ticketId: ticketId, // Ensure ticketId is set
+        id: ticketId, // Also set id for compatibility
+      });
+      console.log('Verification result:', verification);
       
       setVerificationResult({
         valid: verification.valid,
@@ -110,6 +145,12 @@ const Verify = memo(() => {
         origin: parsedData.origin,
         destination: parsedData.destination,
         date: parsedData.date,
+        validUntil: parsedData.validUntil,
+        validFrom: parsedData.validFrom,
+        type: parsedData.type,
+        passType: parsedData.passType,
+        expired: verification.expired,
+        future: verification.future,
         rawTagId: tagId,
         rawData: ticketDataString,
       });
@@ -170,7 +211,7 @@ const Verify = memo(() => {
             Ticket Verification
           </h1>
           <p className="text-xs sm:text-sm px-2" style={{ color: THEME.textMuted, lineHeight: '1.4' }}>
-            Scan NFC tag or enter ticket code manually
+            Scan NFC tag, beacon (phone-to-phone), or enter ticket code manually
           </p>
         </div>
 
@@ -225,7 +266,7 @@ const Verify = memo(() => {
             ) : (
               <>
                 <FiRadio size={20} className="sm:w-6 sm:h-6" style={{ width: '20px', height: '20px' }} />
-                <span>Scan NFC Tag</span>
+                <span>Scan NFC Tag / Beacon</span>
               </>
             )}
           </button>
