@@ -24,3 +24,4 @@ yarn-error.log*
 
 # Build counter (local to each developer)
 .build-counter
+public/build-info.json

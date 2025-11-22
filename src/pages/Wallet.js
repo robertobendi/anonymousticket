@@ -2,7 +2,7 @@ import { useState, useEffect, memo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { FiArrowLeft, FiRadio, FiTrash2, FiSend, FiCreditCard, FiGlobe, FiAlertCircle } from 'react-icons/fi';
 import { useWallet, getWalletForNFC } from '@lib/wallet';
-import { writeNFC } from '@lib/nfc-simple';
+import { writeNFC, startBeacon, stopBeacon } from '@lib/nfc-simple';
 import { checkNFC } from '@lib/nfc-simple';
 import { THEME } from '@lib/themeColors';
 
@@ -16,6 +16,7 @@ const Wallet = memo(() => {
   const [sendError, setSendError] = useState(null);
   const [sendSuccess, setSendSuccess] = useState(false);
   const [nfcAvailable, setNfcAvailable] = useState(false);
+  const [isBeaconActive, setIsBeaconActive] = useState(false);
 
   useEffect(() => {
     // Check NFC availability
@@ -32,6 +33,51 @@ const Wallet = memo(() => {
     };
     checkNFCStatus();
   }, []);
+
+  const handleStartBeacon = async () => {
+    if (tickets.length === 0) {
+      setSendError('No tickets in wallet to share');
+      return;
+    }
+
+    if (isBeaconActive) {
+      // Stop beacon
+      try {
+        await stopBeacon();
+        setIsBeaconActive(false);
+        setSendSuccess(false);
+        setSendError(null);
+      } catch (error) {
+        console.error('Error stopping beacon:', error);
+      }
+      return;
+    }
+
+    setIsSending(true);
+    setSendError(null);
+    setSendSuccess(false);
+
+    try {
+      const status = await checkNFC();
+      if (!status.available || !status.enabled) {
+        setSendError('NFC is not available or disabled.');
+        setIsSending(false);
+        return;
+      }
+      
+      const walletData = getWalletForNFC();
+      const walletJson = JSON.stringify(walletData);
+      
+      await startBeacon(walletJson);
+      setIsBeaconActive(true);
+      setSendSuccess(true);
+      setIsSending(false);
+    } catch (error) {
+      console.error('Beacon error:', error);
+      setSendError(error.message || 'Failed to start beacon');
+      setIsSending(false);
+    }
+  };
 
   const handleSendWallet = async () => {
     if (tickets.length === 0) {
@@ -117,35 +163,49 @@ const Wallet = memo(() => {
 
         {/* NFC Send Section */}
         <div className="p-4 mb-6" style={{ backgroundColor: THEME.card, border: `2px solid ${THEME.border}` }}>
-          <div className="flex items-center justify-between mb-4">
-            <div>
-              <h2 className="text-lg font-bold mb-1" style={{ color: THEME.text }}>
-                Send Wallet via NFC
-              </h2>
-              <p className="text-xs" style={{ color: THEME.textMuted }}>
-                {tickets.length} {tickets.length === 1 ? 'ticket' : 'tickets'} in wallet
-              </p>
+          <div className="mb-4">
+            <h2 className="text-lg font-bold mb-1" style={{ color: THEME.text }}>
+              Share Tickets via NFC
+            </h2>
+            <p className="text-xs mb-3" style={{ color: THEME.textMuted }}>
+              {tickets.length} {tickets.length === 1 ? 'ticket' : 'tickets'} in wallet
+            </p>
+            
+            {/* Two modes: Write to tag, or Beacon mode */}
+            <div className="grid grid-cols-2 gap-3 mb-3">
+              <button
+                onClick={handleSendWallet}
+                disabled={isSending || tickets.length === 0 || !nfcAvailable}
+                className="px-4 py-3 text-white transition-colors font-bold text-xs uppercase disabled:opacity-50 disabled:cursor-not-allowed flex flex-col items-center gap-2"
+                style={{ backgroundColor: THEME.accent }}
+                onMouseEnter={(e) => !e.target.disabled && (e.target.style.backgroundColor = THEME.accentHover)}
+                onMouseLeave={(e) => !e.target.disabled && (e.target.style.backgroundColor = THEME.accent)}
+              >
+                {isSending ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-white"></div>
+                    <span>Writing...</span>
+                  </>
+                ) : (
+                  <>
+                    <FiSend size={18} />
+                    <span>Write to Tag</span>
+                  </>
+                )}
+              </button>
+              
+              <button
+                onClick={handleStartBeacon}
+                disabled={isBeaconActive || tickets.length === 0 || !nfcAvailable}
+                className="px-4 py-3 text-white transition-colors font-bold text-xs uppercase disabled:opacity-50 disabled:cursor-not-allowed flex flex-col items-center gap-2"
+                style={{ backgroundColor: isBeaconActive ? THEME.success : THEME.accent }}
+                onMouseEnter={(e) => !e.target.disabled && !isBeaconActive && (e.target.style.backgroundColor = THEME.accentHover)}
+                onMouseLeave={(e) => !e.target.disabled && !isBeaconActive && (e.target.style.backgroundColor = isBeaconActive ? THEME.success : THEME.accent)}
+              >
+                <FiRadio size={18} />
+                <span>{isBeaconActive ? 'Beacon Active' : 'Start Beacon'}</span>
+              </button>
             </div>
-            <button
-              onClick={handleSendWallet}
-              disabled={isSending || tickets.length === 0 || !nfcAvailable}
-              className="px-6 py-3 text-white transition-colors font-bold text-sm uppercase disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-              style={{ backgroundColor: THEME.accent }}
-              onMouseEnter={(e) => !e.target.disabled && (e.target.style.backgroundColor = THEME.accentHover)}
-              onMouseLeave={(e) => !e.target.disabled && (e.target.style.backgroundColor = THEME.accent)}
-            >
-              {isSending ? (
-                <>
-                  <div className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-white"></div>
-                  Sending...
-                </>
-              ) : (
-                <>
-                  <FiSend size={18} />
-                  Send Wallet
-                </>
-              )}
-            </button>
           </div>
 
           {!nfcAvailable && (
@@ -171,9 +231,26 @@ const Wallet = memo(() => {
             </div>
           )}
 
-          <p className="text-xs" style={{ color: THEME.textMuted }}>
-            Click "Send Wallet" then hold your device near another phone (on Verify page) or an NFC tag to share your tickets.
-          </p>
+          {isBeaconActive ? (
+            <div className="p-3 mb-3" style={{ backgroundColor: `${THEME.success}15`, borderLeft: `4px solid ${THEME.success}` }}>
+              <p className="text-xs font-bold mb-1" style={{ color: THEME.success }}>
+                ✓ Beacon Active - Controller can scan this phone
+              </p>
+              <p className="text-xs" style={{ color: THEME.textMuted }}>
+                Hold this phone near the controller's device. Click "Start Beacon" again to stop.
+              </p>
+            </div>
+          ) : (
+            <>
+              <p className="text-xs mb-2" style={{ color: THEME.textMuted }}>
+                <strong>Two ways to share:</strong>
+              </p>
+              <div className="text-xs mb-2 space-y-1" style={{ color: THEME.textMuted }}>
+                <p><strong>1. Write to Tag:</strong> Write wallet to a physical NFC tag, then controller scans the tag</p>
+                <p><strong>2. Start Beacon:</strong> This phone acts as NFC tag - controller scans directly (most reliable)</p>
+              </div>
+            </>
+          )}
         </div>
 
         {/* Tickets List */}

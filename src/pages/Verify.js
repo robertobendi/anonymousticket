@@ -65,8 +65,10 @@ const Verify = memo(() => {
         return;
       }
 
-      // Start reading NFC
+      // Start reading NFC - keep trying until we get wallet data
+      console.log('Starting NFC read - waiting for wallet data...');
       const nfcData = await startReading();
+      console.log('NFC read completed:', nfcData);
       
       // Extract ticket data - simple format returns {id, data}
       const tagId = nfcData.id || '';

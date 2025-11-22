@@ -126,15 +126,44 @@ public class MainActivity extends BridgeActivity {
                 return "{\"success\":false,\"error\":\"NFC is not available or disabled\"}";
             }
             
-            // Store data to write when tag/device is detected
+            // Store data to share
             pendingWriteData = data;
             isSharingMode = true;
-            android.util.Log.d("MainActivity", "NFC sharing mode enabled - waiting for device/tag...");
+            android.util.Log.d("MainActivity", "═══════════════════════════════════════");
+            android.util.Log.d("MainActivity", "NFC SHARING MODE ENABLED");
+            android.util.Log.d("MainActivity", "Data length: " + data.length() + " bytes");
+            android.util.Log.d("MainActivity", "Mode: Write to NFC tag or device");
+            android.util.Log.d("MainActivity", "═══════════════════════════════════════");
             
             // Enable foreground dispatch to catch NFC intents
             enableNfcForegroundDispatch();
             
-            return "{\"success\":true,\"message\":\"Ready to share. Hold device back-to-back with another phone (on Verify page).\"}";
+            return "{\"success\":true,\"message\":\"Ready! Hold near an NFC tag OR another phone (on Verify page).\"}";
+        }
+        
+        @JavascriptInterface
+        public String startBeacon(String data) {
+            if (data == null || data.isEmpty()) {
+                return "{\"success\":false,\"error\":\"Data is required\"}";
+            }
+            
+            if (nfcAdapter == null || !nfcAdapter.isEnabled()) {
+                return "{\"success\":false,\"error\":\"NFC is not available or disabled\"}";
+            }
+            
+            // Store data for beacon mode
+            pendingWriteData = data;
+            isSharingMode = true;
+            android.util.Log.d("MainActivity", "═══════════════════════════════════════");
+            android.util.Log.d("MainActivity", "NFC BEACON MODE ENABLED");
+            android.util.Log.d("MainActivity", "Phone will act as NFC tag - controller can scan");
+            android.util.Log.d("MainActivity", "═══════════════════════════════════════");
+            
+            // For beacon mode, we'll write to any tag/device that comes near
+            // This makes the phone "broadcast" the data
+            enableNfcForegroundDispatch();
+            
+            return "{\"success\":true,\"message\":\"Beacon active! Controller can scan this phone like an NFC tag.\"}";
         }
 
         @JavascriptInterface
@@ -219,45 +248,59 @@ public class MainActivity extends BridgeActivity {
             String tagId = bytesToHex(tag.getId());
             String tagData = "";
 
-            // Try to read NDEF data - prioritize wallet data
+            // Try to read NDEF data - look for our custom MIME type first
             Parcelable[] rawMessages = intent.getParcelableArrayExtra(NfcAdapter.EXTRA_NDEF_MESSAGES);
             if (rawMessages != null) {
+                String walletMimeType = "application/vnd.ch.sbb.anonymous.wallet";
+                
                 for (Parcelable rawMessage : rawMessages) {
                     android.nfc.NdefMessage message = (android.nfc.NdefMessage) rawMessage;
                     for (android.nfc.NdefRecord record : message.getRecords()) {
                         byte[] payload = record.getPayload();
                         if (payload.length > 0) {
-                            // Try UTF-8 text
-                            try {
-                                String tempData = new String(payload, StandardCharsets.UTF_8);
-                                if (tempData.length() > 0 && tempData.charAt(0) < 0x20) {
-                                    // Skip status byte for text records
-                                    tempData = tempData.substring(1);
-                                }
+                            // Check for our custom MIME type (wallet data)
+                            if (record.getTnf() == NdefRecord.TNF_MIME_MEDIA) {
+                                byte[] typeBytes = record.getType();
+                                String recordType = new String(typeBytes, StandardCharsets.UTF_8);
                                 
-                                // Check if this looks like wallet data (JSON with "wallet" key)
-                                if (tempData.trim().startsWith("{") && tempData.contains("\"wallet\"")) {
-                                    tagData = tempData;
-                                    android.util.Log.d("MainActivity", "✓ Found wallet data!");
+                                if (walletMimeType.equals(recordType)) {
+                                    // This is our wallet data!
+                                    tagData = new String(payload, StandardCharsets.UTF_8);
+                                    android.util.Log.d("MainActivity", "✓ Found wallet data via custom MIME type!");
                                     break;
-                                } else if (tagData.isEmpty()) {
-                                    // Only use non-wallet data if we haven't found wallet data yet
-                                    tagData = tempData;
                                 }
-                            } catch (Exception e) {
-                                if (tagData.isEmpty()) {
-                                    tagData = bytesToHex(payload);
+                            }
+                            
+                            // Fallback: Check for wallet JSON in text records
+                            if (tagData.isEmpty() && record.getTnf() == NdefRecord.TNF_WELL_KNOWN) {
+                                try {
+                                    String tempData = new String(payload, StandardCharsets.UTF_8);
+                                    if (tempData.length() > 0 && tempData.charAt(0) < 0x20) {
+                                        tempData = tempData.substring(1);
+                                    }
+                                    
+                                    // Only accept if it's wallet JSON
+                                    if (tempData.trim().startsWith("{") && tempData.contains("\"wallet\"")) {
+                                        tagData = tempData;
+                                        android.util.Log.d("MainActivity", "✓ Found wallet data in text record!");
+                                        break;
+                                    }
+                                } catch (Exception e) {
+                                    // Ignore
                                 }
                             }
                         }
                     }
-                    if (tagData.contains("\"wallet\"")) break; // Stop if we found wallet data
+                    if (!tagData.isEmpty() && tagData.contains("\"wallet\"")) break; // Stop if we found wallet data
                 }
             }
 
-            // If no NDEF data, use tag ID
+            // If no NDEF data found, log it but don't use tag ID as data
             if (tagData.isEmpty()) {
-                tagData = tagId;
+                android.util.Log.d("MainActivity", "No NDEF wallet data found - only Tag ID available");
+                // Don't send tag ID as data - it's not wallet data
+                // Only send if we actually found wallet data
+                return;
             }
 
             android.util.Log.d("MainActivity", "Tag ID: " + tagId);
@@ -265,19 +308,61 @@ public class MainActivity extends BridgeActivity {
 
             // Check if we need to write data (we're the sender)
             if (isSharingMode && pendingWriteData != null) {
-                android.util.Log.d("MainActivity", "Writing wallet data to detected device/tag...");
+                android.util.Log.d("MainActivity", "═══════════════════════════════════════");
+                android.util.Log.d("MainActivity", "SHARING MODE: Device/tag detected!");
+                android.util.Log.d("MainActivity", "Tag ID: " + tagId);
+                android.util.Log.d("MainActivity", "Tag technologies: " + java.util.Arrays.toString(tag.getTechList()));
+                
                 try {
+                    // Check if tag supports NDEF
+                    String[] techList = tag.getTechList();
+                    boolean supportsNdef = false;
+                    boolean supportsNdefFormatable = false;
+                    for (String tech : techList) {
+                        if (tech.contains("Ndef")) {
+                            supportsNdef = true;
+                        }
+                        if (tech.contains("NdefFormatable")) {
+                            supportsNdefFormatable = true;
+                        }
+                    }
+                    
+                    android.util.Log.d("MainActivity", "Supports NDEF: " + supportsNdef);
+                    android.util.Log.d("MainActivity", "Supports NdefFormatable: " + supportsNdefFormatable);
+                    
+                    if (!supportsNdef && !supportsNdefFormatable) {
+                        android.util.Log.w("MainActivity", "Tag does not support NDEF - might be a phone in read mode");
+                        // For beacon mode, keep trying - don't give up
+                        // For write mode, this is an error
+                        sendNfcWriteResult(false, "Device does not support NDEF writing. Use 'Start Beacon' mode instead, or use a physical NFC tag.");
+                        return;
+                    }
+                    
+                    // Try to write
+                    android.util.Log.d("MainActivity", "Attempting to write wallet data...");
                     writeToTag(tag, pendingWriteData);
-                    android.util.Log.d("MainActivity", "✓ Wallet data written successfully");
+                    android.util.Log.d("MainActivity", "✓✓✓ Wallet data written successfully! ✓✓✓");
+                    android.util.Log.d("MainActivity", "═══════════════════════════════════════");
                     
                     // Send write success event
-                    sendNfcWriteResult(true, "Wallet shared successfully!");
-                    // Keep sharing mode active for multiple shares
+                    sendNfcWriteResult(true, "Wallet written successfully! Controller can now scan the tag/device.");
+                    // Keep sharing mode active for multiple writes (beacon mode)
                     return; // Don't read after writing
+                } catch (IOException e) {
+                    android.util.Log.e("MainActivity", "IO Error writing to tag: " + e.getMessage(), e);
+                    String errorMsg = e.getMessage();
+                    if (errorMsg.contains("not writable")) {
+                        sendNfcWriteResult(false, "Cannot write to this device. Use 'Start Beacon' mode for phone-to-phone, or write to a physical NFC tag.");
+                    } else {
+                        sendNfcWriteResult(false, "Write failed: " + errorMsg);
+                    }
+                } catch (android.nfc.FormatException e) {
+                    android.util.Log.e("MainActivity", "Format Error writing to tag: " + e.getMessage(), e);
+                    sendNfcWriteResult(false, "Format error: " + e.getMessage());
                 } catch (Exception e) {
                     android.util.Log.e("MainActivity", "Error writing to tag: " + e.getMessage(), e);
-                    sendNfcWriteResult(false, "Share failed: " + e.getMessage());
-                    // Continue to read if write fails
+                    e.printStackTrace();
+                    sendNfcWriteResult(false, "Write failed: " + e.getMessage());
                 }
             }
             
@@ -327,44 +412,66 @@ public class MainActivity extends BridgeActivity {
 
     private void writeToTag(Tag tag, String data) throws IOException, android.nfc.FormatException {
         NdefMessage message = createNdefMessage(data);
+        android.util.Log.d("MainActivity", "Created NDEF message, size: " + message.getByteArrayLength() + " bytes");
+        
         Ndef ndef = Ndef.get(tag);
         
         if (ndef != null) {
+            android.util.Log.d("MainActivity", "Tag has NDEF support");
             ndef.connect();
-            if (!ndef.isWritable()) {
+            
+            try {
+                boolean isWritable = ndef.isWritable();
+                int maxSize = ndef.getMaxSize();
+                android.util.Log.d("MainActivity", "NDEF writable: " + isWritable + ", max size: " + maxSize);
+                
+                if (!isWritable) {
+                    ndef.close();
+                    throw new IOException("Tag is not writable (may be a phone in read mode - try with an NFC tag or ensure receiving phone is ready)");
+                }
+                if (maxSize < message.getByteArrayLength()) {
+                    ndef.close();
+                    throw new IOException("Tag capacity too small: " + maxSize + " < " + message.getByteArrayLength());
+                }
+                
+                android.util.Log.d("MainActivity", "Writing NDEF message...");
+                ndef.writeNdefMessage(message);
+                android.util.Log.d("MainActivity", "✓ NDEF message written successfully!");
+            } finally {
                 ndef.close();
-                throw new IOException("Tag is not writable");
             }
-            if (ndef.getMaxSize() < message.getByteArrayLength()) {
-                ndef.close();
-                throw new IOException("Tag capacity is too small");
-            }
-            ndef.writeNdefMessage(message);
-            ndef.close();
         } else {
             // Try to format and write
+            android.util.Log.d("MainActivity", "Tag does not have NDEF, trying NdefFormatable...");
             NdefFormatable formatable = NdefFormatable.get(tag);
             if (formatable != null) {
+                android.util.Log.d("MainActivity", "Tag supports NdefFormatable, formatting...");
                 formatable.connect();
-                formatable.format(message);
-                formatable.close();
+                try {
+                    formatable.format(message);
+                    android.util.Log.d("MainActivity", "✓ Tag formatted and written successfully!");
+                } finally {
+                    formatable.close();
+                }
             } else {
-                throw new IOException("Tag is not NDEF formatable");
+                throw new IOException("Tag is not NDEF formatable (may be a phone - phones are not writable like tags)");
             }
         }
     }
 
     private NdefMessage createNdefMessage(String text) {
         byte[] textBytes = text.getBytes(StandardCharsets.UTF_8);
-        byte[] payload = new byte[1 + textBytes.length];
-        payload[0] = (byte) 0; // UTF-8 encoding
-        System.arraycopy(textBytes, 0, payload, 1, textBytes.length);
+        
+        // Use custom MIME type so Android won't auto-handle it
+        // Only our app will recognize this
+        String mimeType = "application/vnd.ch.sbb.anonymous.wallet";
+        byte[] mimeBytes = mimeType.getBytes(StandardCharsets.UTF_8);
         
         NdefRecord record = new NdefRecord(
-            NdefRecord.TNF_WELL_KNOWN,
-            NdefRecord.RTD_TEXT,
+            NdefRecord.TNF_MIME_MEDIA,
+            mimeBytes,
             new byte[0],
-            payload
+            textBytes
         );
         
         return new NdefMessage(new NdefRecord[]{record});
