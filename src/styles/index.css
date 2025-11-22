@@ -1,0 +1,79 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    @apply antialiased scroll-smooth;
+    background-color: #000000 !important;
+    /* Safe area insets for mobile */
+    padding-top: env(safe-area-inset-top);
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  body {
+    @apply bg-background text-text;
+    min-height: 100vh;
+    min-height: -webkit-fill-available; /* iOS Safari fix */
+    background-color: #000000 !important;
+    color: #ffffff !important;
+    font-family: 'Helvetica Neue', 'Helvetica', 'Arial', sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    /* Prevent text size adjustment on mobile */
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+  }
+  
+  * {
+    --tw-bg-opacity: 1;
+  }
+  
+  input, select, textarea, button {
+    font-family: inherit;
+    background-color: #1a1a1a;
+    color: #ffffff;
+  }
+  
+  /* Override default blue colors - use SBB red */
+  input[type="checkbox"]:checked {
+    background-color: #EB0000;
+    border-color: #EB0000;
+  }
+  
+  input[type="date"]::-webkit-calendar-picker-indicator {
+    filter: invert(1);
+    cursor: pointer;
+  }
+  
+  select:focus {
+    border-color: #EB0000;
+    outline: none;
+  }
+  
+  input:focus {
+    border-color: #EB0000;
+    outline: none;
+  }
+  
+  option {
+    background-color: #1a1a1a;
+    color: #ffffff;
+  }
+}
+
+@layer utilities {
+  .animate-fade-in {
+    animation: fadeIn 0.3s ease-out;
+  }
+  
+  @keyframes fadeIn {
+    from {
+      opacity: 0;
+      transform: translateY(-5px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+} 

@@ -1,0 +1,36 @@
+{
+  "name": "replate",
+  "version": "0.1.0",
+  "homepage": "https://robertobendi.github.io/RePlate/",
+  "private": true,
+  "dependencies": {
+    "@capacitor/android": "^7.4.4",
+    "@capacitor/cli": "^7.4.4",
+    "@capacitor/core": "^7.4.4",
+    "prop-types": "^15.8.1",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-icons": "^5.5.0",
+    "react-router-dom": "^7.2.0"
+  },
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "predeploy": "npm run build",
+    "deploy": "gh-pages -d build",
+    "setup:android": "./setup-android.sh",
+    "build:android": "./build-apk.sh",
+    "sync:android": "npm run build && npx cap sync android"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^4.3.4",
+    "autoprefixer": "^10.4.20",
+    "browserslist-to-esbuild": "^2.1.1",
+    "gh-pages": "^6.3.0",
+    "postcss": "^8.4.49",
+    "tailwindcss": "^3.4.16",
+    "vite": "^6.2.0",
+    "vite-plugin-svgr": "^4.3.0"
+  }
+}

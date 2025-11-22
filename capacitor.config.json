@@ -1,0 +1,11 @@
+{
+  "appId": "ch.sbb.anonymous",
+  "appName": "SBB Anonymous Tickets",
+  "webDir": "build",
+  "bundledWebRuntime": false,
+  "plugins": {
+    "NFC": {
+      "present": true
+    }
+  }
+}
