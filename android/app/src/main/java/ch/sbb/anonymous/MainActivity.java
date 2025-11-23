@@ -165,15 +165,24 @@ public class MainActivity extends BridgeActivity {
             // This makes the phone act like an NFC card that can be read
             WalletHceService.setWalletData(data);
             
+            // Verify HCE data was set
+            if (!WalletHceService.hasWalletData()) {
+                android.util.Log.e("MainActivity", "⚠️ WARNING: HCE data not set properly!");
+            } else {
+                android.util.Log.d("MainActivity", "✓ HCE data verified - service is ready");
+            }
+            
             // Also keep old method as fallback
             pendingWriteData = data;
             isSharingMode = true;
             
             android.util.Log.d("MainActivity", "═══════════════════════════════════════");
             android.util.Log.d("MainActivity", "SHARE MODE ENABLED (HCE + P2P)");
-            android.util.Log.d("MainActivity", "Data length: " + data.length() + " bytes");
+            android.util.Log.d("MainActivity", "Data length: " + data.length() + " chars");
+            android.util.Log.d("MainActivity", "HCE service: ACTIVE");
             android.util.Log.d("MainActivity", "Phone is now emulating NFC card via HCE");
             android.util.Log.d("MainActivity", "Controller can scan this phone like a normal NFC tag");
+            android.util.Log.d("MainActivity", "HCE AID: F0010203040506");
             android.util.Log.d("MainActivity", "═══════════════════════════════════════");
             
             // Enable foreground dispatch as fallback
@@ -265,17 +274,27 @@ public class MainActivity extends BridgeActivity {
             return;
         }
 
-        android.util.Log.d("MainActivity", "NFC tag detected: " + action);
+        android.util.Log.d("MainActivity", "═══════════════════════════════════════");
+        android.util.Log.d("MainActivity", "NFC INTENT RECEIVED");
+        android.util.Log.d("MainActivity", "Action: " + action);
+        android.util.Log.d("MainActivity", "═══════════════════════════════════════");
 
         try {
             Tag tag = intent.getParcelableExtra(NfcAdapter.EXTRA_TAG);
             if (tag == null) {
                 android.util.Log.e("MainActivity", "Tag is null");
+                sendNfcStepEvent("error", "Tag is null", "No tag data in intent");
                 return;
             }
 
             String tagId = bytesToHex(tag.getId());
+            String[] techList = tag.getTechList();
             String tagData = "";
+
+            // Emit step: Tag detected - FIRST STEP
+            android.util.Log.d("MainActivity", "Tag ID: " + tagId);
+            android.util.Log.d("MainActivity", "Tag technologies: " + java.util.Arrays.toString(techList));
+            sendNfcStepEvent("tag_detected", "NFC tag detected", "Tag ID: " + tagId.substring(0, 16) + "... Technologies: " + java.util.Arrays.toString(techList));
 
             // Try to read NDEF data - look for our custom MIME type first
             Parcelable[] rawMessages = intent.getParcelableArrayExtra(NfcAdapter.EXTRA_NDEF_MESSAGES);
@@ -381,35 +400,65 @@ public class MainActivity extends BridgeActivity {
                 android.util.Log.d("MainActivity", "Tag ID: " + tagId);
                 android.util.Log.d("MainActivity", "Tag technologies: " + java.util.Arrays.toString(tag.getTechList()));
                 
-                // PRIORITY 1: Try HCE (ISO-DEP) first - this is how phones share via HCE
+                // PRIORITY 1: ALWAYS try HCE (ISO-DEP) first - this is how phones share via HCE
+                // Even if tag doesn't explicitly list ISO-DEP, try it anyway (HCE phones might not list it)
+                android.util.Log.d("MainActivity", "═══════════════════════════════════════");
+                android.util.Log.d("MainActivity", "ATTEMPTING HCE READ (ISO-DEP)");
+                android.util.Log.d("MainActivity", "This is the PRIMARY method for phone-to-phone sharing");
+                android.util.Log.d("MainActivity", "═══════════════════════════════════════");
+                
+                // Emit step: Starting HCE read
+                sendNfcStepEvent("hce_start", "Attempting HCE read (ISO-DEP)", "Checking if tag supports ISO-DEP...");
+                
                 try {
                     android.nfc.tech.IsoDep isoDep = android.nfc.tech.IsoDep.get(tag);
                     if (isoDep != null) {
                         android.util.Log.d("MainActivity", "✓ Tag supports ISO-DEP (HCE card detected)");
-                        isoDep.setTimeout(5000); // 5 second timeout
-                        isoDep.connect();
+                        sendNfcStepEvent("hce_iso_dep_found", "ISO-DEP supported", "HCE card detected, connecting...");
+                        
+                        isoDep.setTimeout(10000); // 10 second timeout (longer for HCE)
+                        try {
+                            sendNfcStepEvent("hce_connecting", "Connecting to ISO-DEP", "Establishing connection...");
+                            isoDep.connect();
+                            android.util.Log.d("MainActivity", "✓ ISO-DEP connected successfully");
+                            sendNfcStepEvent("hce_connected", "ISO-DEP connected", "Connection established successfully");
+                        } catch (Exception connectError) {
+                            android.util.Log.w("MainActivity", "⚠️ ISO-DEP connect failed: " + connectError.getMessage());
+                            sendNfcStepEvent("hce_connect_failed", "Connection failed", connectError.getMessage());
+                            throw connectError;
+                        }
+                        
                         try {
                             // Send SELECT command for our AID
                             byte[] selectCmd = {
                                 (byte) 0x00, (byte) 0xA4, (byte) 0x04, (byte) 0x00, (byte) 0x07,
                                 (byte) 0xF0, (byte) 0x01, (byte) 0x02, (byte) 0x03, (byte) 0x04, (byte) 0x05, (byte) 0x06
                             };
+                            android.util.Log.d("MainActivity", "═══════════════════════════════════════");
                             android.util.Log.d("MainActivity", "Sending SELECT command for AID: F0010203040506");
+                            sendNfcStepEvent("hce_select_sending", "Sending SELECT command", "AID: F0010203040506");
+                            
                             byte[] selectResponse = isoDep.transceive(selectCmd);
                             String selectResponseHex = bytesToHex(selectResponse);
                             android.util.Log.d("MainActivity", "SELECT response: " + selectResponseHex);
+                            android.util.Log.d("MainActivity", "Response length: " + selectResponse.length);
+                            sendNfcStepEvent("hce_select_response", "SELECT response received", "Response: " + selectResponseHex);
                             
                             // Check if SELECT was successful (0x9000 = success)
                             if (selectResponse.length >= 2 && 
                                 selectResponse[selectResponse.length - 2] == (byte) 0x90 &&
                                 selectResponse[selectResponse.length - 1] == (byte) 0x00) {
-                                android.util.Log.d("MainActivity", "✓ SELECT successful - HCE service found!");
+                                android.util.Log.d("MainActivity", "✓✓✓ SELECT SUCCESSFUL - HCE SERVICE FOUND! ✓✓✓");
+                                sendNfcStepEvent("hce_select_success", "SELECT successful", "HCE service found!");
                                 
                                 // Send GET DATA command to retrieve wallet data
                                 byte[] getDataCmd = {(byte) 0x00, (byte) 0xCA, (byte) 0x00, (byte) 0x00, (byte) 0x00};
                                 android.util.Log.d("MainActivity", "Sending GET DATA command");
+                                sendNfcStepEvent("hce_getdata_sending", "Sending GET DATA command", "Requesting data from HCE service...");
+                                
                                 byte[] dataResponse = isoDep.transceive(getDataCmd);
                                 android.util.Log.d("MainActivity", "GET DATA response length: " + dataResponse.length);
+                                sendNfcStepEvent("hce_getdata_response", "GET DATA response received", "Data length: " + dataResponse.length + " bytes");
                                 
                                 // Extract wallet data (remove status bytes at end: 0x9000)
                                 if (dataResponse.length > 2) {
@@ -417,34 +466,71 @@ public class MainActivity extends BridgeActivity {
                                     String hceData = new String(dataBytes, StandardCharsets.UTF_8);
                                     android.util.Log.d("MainActivity", "HCE data preview: " + hceData.substring(0, Math.min(200, hceData.length())));
                                     
-                                    if (hceData.trim().startsWith("{") && hceData.contains("\"wallet\"")) {
-                                        tagData = hceData;
+                                    // Check if it's wallet JSON or signature message (192 hex chars)
+                                    String trimmedData = hceData.trim();
+                                    boolean isWalletJson = trimmedData.startsWith("{") && trimmedData.contains("\"wallet\"");
+                                    // Check for signature message: exactly 192 hex characters (no whitespace)
+                                    boolean isSignatureMessage = trimmedData.length() == 192 && trimmedData.matches("^[0-9a-fA-F]{192}$");
+                                    
+                                    android.util.Log.d("MainActivity", "Data format check:");
+                                    android.util.Log.d("MainActivity", "  Original length: " + hceData.length());
+                                    android.util.Log.d("MainActivity", "  Trimmed length: " + trimmedData.length());
+                                    android.util.Log.d("MainActivity", "  Is wallet JSON: " + isWalletJson);
+                                    android.util.Log.d("MainActivity", "  Is signature message: " + isSignatureMessage);
+                                    android.util.Log.d("MainActivity", "  First 50 chars: " + trimmedData.substring(0, Math.min(50, trimmedData.length())));
+                                    
+                                    if (isWalletJson || isSignatureMessage) {
+                                        // Use trimmed data to avoid whitespace issues
+                                        tagData = trimmedData;
                                         android.util.Log.d("MainActivity", "✓✓✓✓✓✓✓✓✓✓✓✓✓✓✓✓✓✓✓✓✓✓✓✓✓✓✓✓✓✓✓✓✓✓✓✓✓✓✓✓✓✓✓✓");
-                                        android.util.Log.d("MainActivity", "✓✓✓ FOUND WALLET DATA VIA HCE! ✓✓✓");
-                                        android.util.Log.d("MainActivity", "Data length: " + hceData.length() + " chars");
+                                        if (isSignatureMessage) {
+                                            android.util.Log.d("MainActivity", "✓✓✓ FOUND SIGNATURE MESSAGE VIA HCE! ✓✓✓");
+                                            sendNfcStepEvent("hce_data_parsed", "Signature message found", "192 hex characters detected");
+                                        } else {
+                                            android.util.Log.d("MainActivity", "✓✓✓ FOUND WALLET DATA VIA HCE! ✓✓✓");
+                                            sendNfcStepEvent("hce_data_parsed", "Wallet data found", "JSON wallet data detected");
+                                        }
+                                        android.util.Log.d("MainActivity", "Data length: " + trimmedData.length() + " chars");
                                         android.util.Log.d("MainActivity", "✓✓✓✓✓✓✓✓✓✓✓✓✓✓✓✓✓✓✓✓✓✓✓✓✓✓✓✓✓✓✓✓✓✓✓✓✓✓✓✓✓✓✓✓");
                                     } else {
-                                        android.util.Log.w("MainActivity", "HCE data does not contain wallet JSON");
+                                        android.util.Log.w("MainActivity", "⚠️ HCE data format not recognized");
+                                        android.util.Log.w("MainActivity", "Expected: wallet JSON or 192-char hex signature");
+                                        android.util.Log.w("MainActivity", "Got length: " + trimmedData.length() + " chars");
+                                        android.util.Log.w("MainActivity", "Got preview: " + trimmedData.substring(0, Math.min(50, trimmedData.length())));
+                                        sendNfcStepEvent("hce_data_invalid", "Data format not recognized", "Expected wallet JSON or 192-char hex signature, got " + trimmedData.length() + " chars");
                                     }
                                 } else {
-                                    android.util.Log.w("MainActivity", "GET DATA response too short");
+                                    android.util.Log.w("MainActivity", "⚠️ GET DATA response too short: " + dataResponse.length);
                                 }
                             } else {
-                                android.util.Log.d("MainActivity", "SELECT failed or not our HCE service (response: " + selectResponseHex + ")");
+                                android.util.Log.d("MainActivity", "SELECT failed or not our HCE service");
+                                android.util.Log.d("MainActivity", "Response: " + selectResponseHex);
+                                android.util.Log.d("MainActivity", "This might be a different HCE service or regular NFC tag");
+                                sendNfcStepEvent("hce_select_failed", "SELECT failed", "Not our HCE service or different tag type");
                             }
                         } catch (Exception e) {
-                            android.util.Log.w("MainActivity", "HCE communication error: " + e.getMessage());
+                            android.util.Log.w("MainActivity", "⚠️ HCE communication error: " + e.getMessage());
+                            android.util.Log.w("MainActivity", "Stack trace: " + android.util.Log.getStackTraceString(e));
+                            sendNfcStepEvent("hce_error", "HCE communication error", e.getMessage());
                         } finally {
                             try {
                                 isoDep.close();
+                                android.util.Log.d("MainActivity", "ISO-DEP connection closed");
                             } catch (Exception e) {
                                 android.util.Log.w("MainActivity", "Error closing ISO-DEP: " + e.getMessage());
                             }
                         }
+                    } else {
+                        android.util.Log.d("MainActivity", "⚠️ Tag does NOT support ISO-DEP (not an HCE card)");
+                        android.util.Log.d("MainActivity", "This is likely a physical NFC tag, not a phone in HCE mode");
+                        sendNfcStepEvent("hce_not_supported", "ISO-DEP not supported", "This tag doesn't support HCE (likely a physical NFC tag)");
                     }
                 } catch (Exception e) {
-                    android.util.Log.d("MainActivity", "ISO-DEP not available or error: " + e.getMessage());
+                    android.util.Log.d("MainActivity", "⚠️ ISO-DEP not available or error: " + e.getMessage());
+                    android.util.Log.d("MainActivity", "This is normal for physical NFC tags");
+                    sendNfcStepEvent("hce_error", "ISO-DEP error", e.getMessage());
                 }
+                android.util.Log.d("MainActivity", "═══════════════════════════════════════");
                 
                 // PRIORITY 2: Try NDEF direct read (for regular P2P)
                 if (tagData.isEmpty()) {
@@ -526,10 +612,9 @@ public class MainActivity extends BridgeActivity {
                 android.util.Log.d("MainActivity", "═══════════════════════════════════════");
                 android.util.Log.d("MainActivity", "SHARE MODE: Device detected!");
                 android.util.Log.d("MainActivity", "Tag ID: " + tagId);
-                android.util.Log.d("MainActivity", "Tag technologies: " + java.util.Arrays.toString(tag.getTechList()));
+                android.util.Log.d("MainActivity", "Tag technologies: " + java.util.Arrays.toString(techList));
                 
                 // Check if this is a physical NFC tag (writable) or a phone (not writable)
-                String[] techList = tag.getTechList();
                 boolean isPhysicalTag = false;
                 for (String tech : techList) {
                     if (tech.contains("Ndef") || tech.contains("NdefFormatable")) {
@@ -587,6 +672,55 @@ public class MainActivity extends BridgeActivity {
 
         } catch (Exception e) {
             android.util.Log.e("MainActivity", "Error handling NFC: " + e.getMessage(), e);
+        }
+    }
+
+    private void sendNfcStepEvent(String step, String message, String details) {
+        if (webView == null) {
+            android.util.Log.w("MainActivity", "⚠️ WebView is null, cannot send step event: " + step);
+            return;
+        }
+        try {
+            // Escape strings for JavaScript
+            String escapedStep = (step != null ? step : "").replace("\\", "\\\\").replace("'", "\\'").replace("\n", "\\n").replace("\r", "\\r");
+            String escapedMessage = (message != null ? message : "").replace("\\", "\\\\").replace("'", "\\'").replace("\n", "\\n").replace("\r", "\\r").replace("\"", "\\\"");
+            String escapedDetails = (details != null ? details : "").replace("\\", "\\\\").replace("'", "\\'").replace("\n", "\\n").replace("\r", "\\r").replace("\"", "\\\"");
+            
+            android.util.Log.d("MainActivity", "📤 Sending step event: " + step + " - " + message);
+            
+            String js = String.format(
+                "try { " +
+                "  if (window.dispatchEvent) { " +
+                "    var event = new CustomEvent('nfcstep', { " +
+                "      detail: { " +
+                "        step: '%s', " +
+                "        message: '%s', " +
+                "        details: '%s', " +
+                "        timestamp: new Date().toISOString() " +
+                "      } " +
+                "    }); " +
+                "    window.dispatchEvent(event); " +
+                "    console.log('✅ Step event dispatched:', '%s'); " +
+                "  } else { " +
+                "    console.error('❌ window.dispatchEvent not available'); " +
+                "  } " +
+                "} catch(e) { " +
+                "  console.error('❌ Error dispatching step event:', e); " +
+                "}",
+                escapedStep, escapedMessage, escapedDetails, step
+            );
+            
+            webView.post(() -> {
+                try {
+                    webView.evaluateJavascript(js, null);
+                    android.util.Log.d("MainActivity", "✓ Step event JavaScript executed");
+                } catch (Exception e) {
+                    android.util.Log.e("MainActivity", "❌ Error evaluating JavaScript: " + e.getMessage());
+                }
+            });
+        } catch (Exception e) {
+            android.util.Log.e("MainActivity", "❌ Error sending step event: " + e.getMessage());
+            android.util.Log.e("MainActivity", "Stack trace: " + android.util.Log.getStackTraceString(e));
         }
     }
 

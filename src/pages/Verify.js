@@ -25,6 +25,8 @@ const Verify = memo(() => {
   const [showRawData, setShowRawData] = useState(false);
   const [isContinuousMode, setIsContinuousMode] = useState(false);
   const [isVerifying, setIsVerifying] = useState(false);
+  const [nfcDetection, setNfcDetection] = useState(null); // Show feedback when NFC detects something
+  const [nfcSteps, setNfcSteps] = useState([]); // Step-by-step NFC process feedback
 
   useEffect(() => {
     // Check NFC availability - don't request permission on load to avoid blocking
@@ -58,10 +60,45 @@ const Verify = memo(() => {
   };
 
   const handleReadNFC = async () => {
-    setIsReading(true);
-    setError(null);
-    setVerificationResult(null);
-    setIsVerifying(false);
+      setIsReading(true);
+      setError(null);
+      setVerificationResult(null);
+      setIsVerifying(false);
+      setNfcDetection(null); // Clear previous detection
+      setNfcSteps([]); // Clear previous steps
+
+    // Listen for NFC detection events (any detection, even if not expected format)
+    const detectionHandler = (event) => {
+      const detection = event.detail;
+      setNfcDetection({
+        attempt: detection.attempt,
+        tagId: detection.tagId,
+        dataLength: detection.dataLength,
+        dataPreview: detection.dataPreview,
+        hasData: detection.hasData,
+        timestamp: new Date().toLocaleTimeString()
+      });
+      console.log('📡 NFC Detection:', detection);
+    };
+    
+    // Listen for step-by-step NFC process events
+    const stepHandler = (event) => {
+      const step = event.detail;
+      console.log('📋 NFC Step Event Received:', step);
+      setNfcSteps(prev => {
+        const newSteps = [...prev, {
+          step: step.step,
+          message: step.message,
+          details: step.details,
+          timestamp: step.timestamp || new Date().toISOString()
+        }];
+        console.log('📋 Total steps:', newSteps.length);
+        return newSteps;
+      });
+    };
+    
+    window.addEventListener('nfcdetection', detectionHandler);
+    window.addEventListener('nfcstep', stepHandler);
 
     try {
       // Request NFC permission first (shows Android system dialog)
@@ -211,6 +248,9 @@ const Verify = memo(() => {
       }
     } finally {
       setIsReading(false);
+      // Clean up event listeners
+      window.removeEventListener('nfcdetection', detectionHandler);
+      window.removeEventListener('nfcstep', stepHandler);
     }
   };
 
@@ -377,6 +417,123 @@ const Verify = memo(() => {
                 <pre className="text-xs sm:text-sm leading-relaxed whitespace-pre-wrap break-words" style={{ color: '#ff0000' }}>{error}</pre>
               </div>
             </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* NFC Detection Feedback */}
+        <AnimatePresence>
+          {nfcDetection && isReading && (
+            <motion.div
+              initial={{ opacity: 0, y: -10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              className="p-3 sm:p-4 mb-4 sm:mb-6 border-2 rounded-lg"
+              style={{ 
+                backgroundColor: `${THEME.accent}15`,
+                borderColor: THEME.accent,
+                borderRadius: '8px'
+              }}
+            >
+              <div className="flex items-start gap-2">
+                <FiRadio style={{ color: THEME.accent, marginTop: '2px', flexShrink: 0 }} size={18} />
+                <div className="flex-1">
+                  <p className="text-xs font-bold mb-1" style={{ color: THEME.accent }}>
+                    📡 NFC Detected (Attempt {nfcDetection.attempt})
+                  </p>
+                  {nfcDetection.tagId && (
+                    <p className="text-xs mb-1" style={{ color: THEME.textMuted }}>
+                      Tag ID: {nfcDetection.tagId.substring(0, 16)}...
+                    </p>
+                  )}
+                  {nfcDetection.hasData ? (
+                    <p className="text-xs" style={{ color: THEME.textMuted }}>
+                      Data: {nfcDetection.dataLength} chars - {nfcDetection.dataPreview.substring(0, 50)}...
+                    </p>
+                  ) : (
+                    <p className="text-xs" style={{ color: THEME.textMuted }}>
+                      Tag detected but no readable data yet...
+                    </p>
+                  )}
+                  <p className="text-xs mt-1" style={{ color: THEME.textMuted }}>
+                    {nfcDetection.timestamp}
+                  </p>
+                </div>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Step-by-Step NFC Process Feedback */}
+        <AnimatePresence>
+          {nfcSteps.length > 0 && (
+            <motion.div
+              initial={{ opacity: 0, y: -10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              className="p-3 sm:p-4 mb-4 sm:mb-6 border-2 rounded-lg"
+              style={{ 
+                backgroundColor: THEME.card,
+                borderColor: THEME.border,
+                borderRadius: '8px'
+              }}
+            >
+              <div className="flex items-start gap-2 mb-2">
+                <FiRefreshCw style={{ color: THEME.accent, marginTop: '2px', flexShrink: 0 }} size={18} />
+                <p className="text-xs font-bold" style={{ color: THEME.text }}>
+                  📋 NFC Process Steps ({nfcSteps.length})
+                </p>
+              </div>
+              <div className="space-y-1 max-h-64 overflow-y-auto">
+                {nfcSteps.map((step, index) => {
+                  const stepIcons = {
+                    'tag_detected': '🏷️',
+                    'hce_start': '🔄',
+                    'hce_iso_dep_found': '✅',
+                    'hce_connecting': '🔌',
+                    'hce_connected': '✅',
+                    'hce_select_sending': '📤',
+                    'hce_select_response': '📥',
+                    'hce_select_success': '✅',
+                    'hce_getdata_sending': '📤',
+                    'hce_getdata_response': '📥',
+                    'hce_data_parsed': '✅',
+                    'hce_data_invalid': '⚠️',
+                    'hce_select_failed': '❌',
+                    'hce_not_supported': 'ℹ️',
+                    'hce_error': '❌',
+                    'hce_connect_failed': '❌',
+                    'error': '❌'
+                  };
+                  const icon = stepIcons[step.step] || '📋';
+                  const isError = step.step.includes('error') || step.step.includes('failed') || step.step.includes('invalid');
+                  const isSuccess = step.step.includes('success') || step.step.includes('parsed') || step.step === 'hce_connected';
+                  
+                  return (
+                    <motion.div
+                      key={index}
+                      initial={{ opacity: 0, x: -10 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      className="flex items-start gap-2 text-xs"
+                      style={{ 
+                        color: isError ? '#ff0000' : isSuccess ? THEME.accent : THEME.textMuted,
+                        paddingLeft: '8px',
+                        borderLeft: `2px solid ${isError ? '#ff0000' : isSuccess ? THEME.accent : THEME.border}`
+                      }}
+                    >
+                      <span className="flex-shrink-0">{icon}</span>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium break-words">{step.message}</p>
+                        {step.details && (
+                          <p className="text-xs mt-0.5 opacity-75 break-words" style={{ color: THEME.textMuted }}>
+                            {step.details}
+                          </p>
+                        )}
+                      </div>
+                    </motion.div>
+                  );
+                })}
+              </div>
             </motion.div>
           )}
         </AnimatePresence>

@@ -5,10 +5,8 @@
  */
 
 import * as nacl from 'tweetnacl';
-import { Capacitor } from '@capacitor/core';
 
 const PRIVATE_KEY_STORAGE_KEY = 'ticket_private_keys';
-
 // API is now HTTPS - same URL works for both web and Android
 const API_BASE_URL = 'https://threeheads.it';
 
@@ -399,80 +397,112 @@ export async function submitMintTransaction({ ticketId, payload, signature }) {
     console.log('📤 Full transaction JSON:', transactionJson);
     console.log('📤 Payload being signed:', JSON.stringify(payload));
     
+    // Use local proxy to avoid CORS - proxy forwards to blockchain server
     const submitUrl = `${API_BASE_URL}/submit`;
     console.log('📤 Submitting to URL:', submitUrl);
     
-    // Use standard fetch() with HTTPS - normal API request
-    try {
-      const response = await fetch(submitUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-        },
-        body: JSON.stringify(transaction),
-      });
+    // Use XMLHttpRequest - bypasses more browser restrictions
+    const response = await new Promise((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
       
-      console.log(`📥 Response status: ${response.status}`);
-      console.log(`📥 Response ok: ${response.ok}`);
-      
-      const responseText = await response.text();
-      console.log(`📥 Response text length: ${responseText.length}`);
-      console.log(`📥 Response text (first 500 chars):`, responseText.substring(0, 500));
-      
-      if (!response.ok) {
-        // Try to parse error message
-        let errorMessage = `HTTP error! status: ${response.status}`;
-        try {
-          if (responseText) {
-            const errorJson = JSON.parse(responseText);
-            errorMessage += `, message: ${JSON.stringify(errorJson)}`;
-          } else {
-            errorMessage += `, empty response body`;
-          }
-        } catch (e) {
-          errorMessage += `, response: ${responseText.substring(0, 200)}`;
-        }
-        console.error('❌ Submit failed:', errorMessage);
-        throw new Error(errorMessage);
-      }
-      
-      // Check if we got HTML instead of JSON
-      if (responseText.trim().startsWith('<!DOCTYPE') || responseText.trim().startsWith('<html')) {
-        console.error('❌ Received HTML instead of JSON. Response:', responseText.substring(0, 200));
-        throw new Error('Server returned HTML instead of JSON. Please check the API endpoint.');
-      }
-      
-      // Parse JSON response
-      let data;
       try {
-        data = JSON.parse(responseText);
-      } catch (e) {
-        console.error('❌ Failed to parse JSON. Response:', responseText.substring(0, 200));
-        throw new Error('Failed to parse JSON response: ' + (e?.message || String(e)));
+        xhr.open('POST', submitUrl, true);
+        xhr.setRequestHeader('Content-Type', 'application/json');
+        xhr.setRequestHeader('Accept', 'application/json');
+      } catch (openError) {
+        const errorMsg = `Failed to open request: ${openError?.message || String(openError)}`;
+        console.error('❌ XHR open error:', errorMsg);
+        reject(new Error(errorMsg));
+        return;
       }
       
-      console.log('✅ MINT transaction submitted successfully:', data);
-      return data;
-    } catch (fetchError) {
-      // Provide helpful error message
-      let errorMsg = `Network error: Cannot connect to ${submitUrl}.`;
+      xhr.onload = function() {
+        const responseText = xhr.responseText || '';
+        const status = xhr.status || 0;
+        console.log(`📥 Response status: ${status}`);
+        console.log(`📥 Response text length: ${responseText.length}`);
+        console.log(`📥 Response text (first 500 chars):`, responseText.substring(0, 500));
+        
+        if (status >= 200 && status < 300) {
+          // Check if we got HTML instead of JSON (proxy not working)
+          if (responseText.trim().startsWith('<!DOCTYPE') || responseText.trim().startsWith('<html')) {
+            console.error('❌ Received HTML instead of JSON. Response:', responseText.substring(0, 200));
+            reject(new Error('Server returned HTML instead of JSON. Proxy may not be working.'));
+            return;
+          }
+          
+          try {
+            const json = JSON.parse(responseText);
+            resolve({
+              ok: true,
+              status: status,
+              json: async () => json,
+              text: async () => responseText,
+            });
+          } catch (e) {
+            console.error('❌ Failed to parse JSON. Response:', responseText.substring(0, 200));
+            reject(new Error('Failed to parse JSON response: ' + (e?.message || String(e))));
+          }
+        } else {
+          // Even on error, try to parse JSON to get error message
+          let errorMessage = `HTTP error! status: ${status}`;
+          try {
+            if (responseText) {
+              const errorJson = JSON.parse(responseText);
+              errorMessage += `, message: ${JSON.stringify(errorJson)}`;
+            } else {
+              errorMessage += `, empty response body`;
+            }
+          } catch (e) {
+            errorMessage += `, response: ${responseText.substring(0, 200)}`;
+          }
+          console.error('❌ Submit failed:', errorMessage);
+          reject(new Error(errorMessage));
+        }
+      };
       
-      if (fetchError.name === 'TypeError' && fetchError.message.includes('Failed to fetch')) {
-        errorMsg += ' This could be due to: CORS issue, SSL certificate error, or network connectivity problem.';
-      } else if (fetchError.message) {
-        errorMsg = fetchError.message;
+      xhr.onerror = function(event) {
+        const errorMsg = `Network error: Failed to connect to ${submitUrl}. This could be a CORS issue, network problem, or the server is unreachable. Status: ${xhr.status || 'unknown'}, ReadyState: ${xhr.readyState}`;
+        console.error('❌ XHR onerror:', errorMsg, {
+          status: xhr.status,
+          readyState: xhr.readyState,
+          responseText: xhr.responseText?.substring(0, 200),
+          event: event
+        });
+        reject(new Error(errorMsg));
+      };
+      
+      xhr.ontimeout = function() {
+        const errorMsg = `Request timeout: Server did not respond within 30 seconds.`;
+        console.error('❌ XHR timeout:', errorMsg);
+        reject(new Error(errorMsg));
+      };
+      
+      xhr.onabort = function() {
+        const errorMsg = `Request aborted: The request was cancelled.`;
+        console.error('❌ XHR aborted:', errorMsg);
+        reject(new Error(errorMsg));
+      };
+      
+      xhr.timeout = 30000; // 30 seconds
+      
+      try {
+        xhr.send(JSON.stringify(transaction));
+      } catch (sendError) {
+        const errorMsg = `Failed to send request: ${sendError?.message || String(sendError)}`;
+        console.error('❌ XHR send error:', errorMsg);
+        reject(new Error(errorMsg));
       }
-      
-      console.error('❌ Fetch error:', errorMsg, {
-        error: fetchError,
-        name: fetchError.name,
-        message: fetchError.message,
-        stack: fetchError.stack,
-        url: submitUrl
-      });
-      throw new Error(errorMsg);
+    });
+    
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Submit failed: ${errorText}`);
     }
+    
+    const data = await response.json();
+    console.log('✅ MINT transaction submitted successfully:', data);
+    return data;
   } catch (error) {
     // Ensure error has a message
     const errorMessage = error?.message || error?.toString() || String(error) || 'Unknown error occurred';

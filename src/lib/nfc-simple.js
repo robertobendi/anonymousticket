@@ -70,8 +70,26 @@ export async function startReading() {
         preview: tagData?.substring(0, 100) + '...' 
       });
 
-      // Check if this is wallet data
-      if (tagData && (tagData.includes('"wallet"') || tagData.includes('"tickets"'))) {
+      // Emit detection event for ANY NFC detection (even if not expected format)
+      if (tagId || tagData) {
+        const detectionEvent = new CustomEvent('nfcdetection', {
+          detail: {
+            attempt: attempts,
+            tagId: tagId,
+            dataLength: tagData?.length || 0,
+            dataPreview: tagData?.substring(0, 100) || '',
+            hasData: !!(tagData && tagData.length > 0)
+          }
+        });
+        window.dispatchEvent(detectionEvent);
+      }
+
+      // Check if this is wallet data or signature message
+      const trimmedData = tagData?.trim() || '';
+      const isWalletJson = trimmedData.includes('"wallet"') || trimmedData.includes('"tickets"');
+      const isSignatureMessage = /^[0-9a-fA-F]{192}$/.test(trimmedData); // 192 hex chars = signature message
+      
+      if (tagData && (isWalletJson || isSignatureMessage)) {
         if (resolved) return;
         resolved = true;
 
@@ -86,7 +104,11 @@ export async function startReading() {
           // Ignore
         }
 
-        console.log('✓✓✓ Wallet data received! ✓✓✓');
+        if (isSignatureMessage) {
+          console.log('✓✓✓ Signature message received via HCE! ✓✓✓');
+        } else {
+          console.log('✓✓✓ Wallet data received! ✓✓✓');
+        }
         resolve({
           id: tagId,
           data: tagData
@@ -94,6 +116,7 @@ export async function startReading() {
       } else if (tagData && tagData.length > 0) {
         // Got some data but not wallet - log it and keep listening
         console.log(`Attempt ${attempts}: Got data but not wallet format, continuing...`);
+        console.log(`Detected data (${tagData.length} chars):`, tagData.substring(0, 200));
         
         if (attempts >= maxAttempts) {
           // After max attempts, reject if no wallet data
@@ -107,9 +130,12 @@ export async function startReading() {
             } catch (e) {
               // Ignore
             }
-            reject(new Error(`No wallet data received after ${maxAttempts} attempts. Make sure: 1) Sending phone clicked "Start Beacon", 2) Both phones unlocked, 3) Hold phones back-to-back.`));
+            reject(new Error(`No wallet data received after ${maxAttempts} attempts. Detected ${tagData.length} chars of data but not in expected format. Make sure: 1) Sending phone clicked "Validate", 2) Both phones unlocked, 3) Hold phones back-to-back.`));
           }
         }
+      } else if (tagId) {
+        // Tag detected but no data - still show feedback
+        console.log(`Attempt ${attempts}: NFC tag detected (ID: ${tagId.substring(0, 16)}...) but no readable data`);
       } else {
         // No data yet, keep listening
         console.log(`Attempt ${attempts}: No data yet, continuing to listen...`);

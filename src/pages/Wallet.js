@@ -38,7 +38,9 @@ const Wallet = memo(() => {
   }, []);
 
   /**
-   * Handle sharing a single ticket via NFC beacon
+   * Handle sharing a single ticket via NFC using Host Card Emulation (HCE)
+   * Creates a signature message (public key + signature) and shares it via HCE
+   * Controller can scan this phone to receive the signature and verify the ticket
    * @param {Object} ticket - Ticket to share
    */
   const handleShareTicket = async (ticket) => {
