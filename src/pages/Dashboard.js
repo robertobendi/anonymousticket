@@ -86,9 +86,10 @@ const Dashboard = memo(() => {
     let totem = 0;
     chainData.blocks.forEach(block => {
       block.transactions?.forEach(tx => {
-        // Only count MINT transactions
-        if (tx.type === 'MINT') {
-          const device = tx.payload?.deviceId || '';
+        // Count all transactions for device distribution
+        const device = tx.payload?.deviceId || '';
+        // If no device ID, we can't classify it, so skip or count as 'unknown' (here skipping to keep chart clean)
+        if (device) {
           if (device.toUpperCase().includes('PHONE')) {
             phone++;
           } else {
@@ -780,7 +781,7 @@ const Dashboard = memo(() => {
           <AnimatedCard className="p-4 sm:p-6 rounded-lg border-2" style={{ backgroundColor: THEME.card, borderColor: THEME.border }}>
             <h3 className="text-lg font-bold mb-4 flex items-center gap-2" style={{ color: THEME.text }}>
               <FiBarChart2 size={20} style={{ color: THEME.accent }} />
-              Device Sales Distribution
+              Device Distribution
             </h3>
             
             <div className="flex flex-col sm:flex-row items-center justify-center gap-8">
