@@ -238,10 +238,10 @@ const Wallet = memo(() => {
                       }}
                       whileHover={{ opacity: 0.8, scale: 1.05 }}
                       whileTap={{ scale: 0.95 }}
-                      aria-label="Show QR Code"
+                      aria-label="Validate Ticket"
                     >
                       <FiCreditCard size={16} />
-                      <span>Show QR</span>
+                      <span>Validate</span>
                     </motion.button>
                     <motion.button
                       onClick={() => {

@@ -4,5 +4,4 @@
     <string name="title_activity_main">SBB Anonymous Tickets</string>
     <string name="package_name">ch.sbb.anonymous</string>
     <string name="custom_url_scheme">ch.sbb.anonymous</string>
-    <string name="hce_service_description">SBB Wallet - Share tickets via NFC</string>
 </resources>

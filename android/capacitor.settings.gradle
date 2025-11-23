@@ -2,5 +2,5 @@
 include ':capacitor-android'
 project(':capacitor-android').projectDir = new File('../node_modules/@capacitor/android/capacitor')
 
-// include \x27:capacitor-http\x27 // Disabled - causes compilation errors
-// project(\x27:capacitor-http\x27) // Disabled - causes compilation errors
+// include ':capacitor-http' // Disabled - causes compilation errors
+// project(':capacitor-http').projectDir = new File('../node_modules/@capacitor/http/android')
