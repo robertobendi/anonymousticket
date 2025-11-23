@@ -1,14 +1,15 @@
 <?xml version="1.0" encoding="utf-8"?>
 <network-security-config>
-    <!-- Allow cleartext traffic for blockchain server -->
-    <domain-config cleartextTrafficPermitted="true">
-        <domain includeSubdomains="true">83.229.83.184</domain>
-    </domain-config>
-    <!-- Allow all cleartext traffic (for development) -->
+    <!-- Allow ALL cleartext traffic - NO SECURITY RESTRICTIONS -->
     <base-config cleartextTrafficPermitted="true">
         <trust-anchors>
             <certificates src="system" />
+            <certificates src="user" />
         </trust-anchors>
     </base-config>
+    <!-- Explicitly allow blockchain server -->
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="true">83.229.83.184</domain>
+    </domain-config>
 </network-security-config>
 

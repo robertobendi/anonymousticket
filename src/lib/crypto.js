@@ -9,9 +9,24 @@ import { Capacitor } from '@capacitor/core';
 
 const PRIVATE_KEY_STORAGE_KEY = 'ticket_private_keys';
 
-// Both Android and Web use the same proxy endpoint
-// The proxy server (running on dev machine) forwards to blockchain server
-const API_BASE_URL = '/api';
+// Detect platform and use appropriate API URL
+// Web (HTTPS): Use proxy to avoid mixed content issues (HTTPS can't call HTTP)
+// Android: Use direct blockchain server (no mixed content restrictions in native apps)
+const isAndroid = Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'android';
+const isWeb = !isAndroid;
+
+const getApiBaseUrl = () => {
+  if (isAndroid) {
+    // Android: Direct connection to blockchain server
+    return 'http://83.229.83.184:8000';
+  }
+  
+  // Web: Use proxy to avoid mixed content (HTTPS -> HTTP is blocked by browsers)
+  // The proxy server handles the HTTP connection to blockchain server
+  return '/api';
+};
+
+const API_BASE_URL = getApiBaseUrl();
 
 /**
  * Generate Ed25519 key pair
@@ -368,12 +383,19 @@ export async function submitMintTransaction({ ticketId, payload, signature }) {
       };
       
       xhr.onerror = function(event) {
-        const errorMsg = `Network error: Failed to connect to ${submitUrl}. This could be a CORS issue, network problem, or the server is unreachable. Status: ${xhr.status || 'unknown'}, ReadyState: ${xhr.readyState}`;
+        // Provide helpful error message
+        let errorMsg = `Network error: Cannot connect to ${submitUrl}.`;
+        if (submitUrl.startsWith('/api')) {
+          errorMsg += ' Make sure the dev server is running (npm run server) and accessible from your device.';
+        } else {
+          errorMsg += ' Check your internet connection and ensure the server is reachable.';
+        }
         console.error('❌ XHR onerror:', errorMsg, {
           status: xhr.status,
           readyState: xhr.readyState,
           responseText: xhr.responseText?.substring(0, 200),
-          event: event
+          event: event,
+          url: submitUrl
         });
         reject(new Error(errorMsg));
       };
