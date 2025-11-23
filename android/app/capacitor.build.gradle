@@ -9,7 +9,8 @@ android {
 
 apply from: "../capacitor-cordova-android-plugins/cordova.variables.gradle"
 dependencies {
-    implementation project(':capacitor-http')
+    // Temporarily disabled - plugin has compilation errors and is not used in the app
+    // implementation project(':capacitor-http')
 
 }
 

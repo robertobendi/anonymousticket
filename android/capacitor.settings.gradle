@@ -2,5 +2,6 @@
 include ':capacitor-android'
 project(':capacitor-android').projectDir = new File('../node_modules/@capacitor/android/capacitor')
 
-include ':capacitor-http'
-project(':capacitor-http').projectDir = new File('../node_modules/@capacitor/http/android')
+// Temporarily disabled - plugin has compilation errors and is not used in the app
+// include ':capacitor-http'
+// project(':capacitor-http').projectDir = new File('../node_modules/@capacitor/http/android')

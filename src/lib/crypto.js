@@ -5,9 +5,12 @@
  */
 
 import * as nacl from 'tweetnacl';
+import { Capacitor } from '@capacitor/core';
 
 const PRIVATE_KEY_STORAGE_KEY = 'ticket_private_keys';
-// Use local proxy to avoid CORS issues - proxy forwards to blockchain server
+
+// Both Android and Web use the same proxy endpoint
+// The proxy server (running on dev machine) forwards to blockchain server
 const API_BASE_URL = '/api';
 
 /**
@@ -300,11 +303,11 @@ export async function submitMintTransaction({ ticketId, payload, signature }) {
     console.log('📤 Full transaction JSON:', transactionJson);
     console.log('📤 Payload being signed:', JSON.stringify(payload));
     
-    // Use local proxy to avoid CORS - proxy forwards to blockchain server
+    // Use the same XMLHttpRequest approach for both Android and Web
     const submitUrl = `${API_BASE_URL}/submit`;
     console.log('📤 Submitting to URL:', submitUrl);
     
-    // Use XMLHttpRequest - bypasses more browser restrictions
+    // Use XMLHttpRequest - works the same on both Android and Web
     const response = await new Promise((resolve, reject) => {
       const xhr = new XMLHttpRequest();
       
