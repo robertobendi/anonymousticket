@@ -127,8 +127,8 @@ const Dashboard = memo(() => {
 
   // Fetch chain data function - ZERO SECURITY
   const fetchChainData = useCallback(async (retries = 3) => {
-    // Use proxy endpoint (Apache rewrites to blockchain API)
-    const apiUrl = '/api/chain';
+    // Use direct HTTPS API endpoint
+    const apiUrl = 'https://threeheads.it/chain';
     
     for (let attempt = 1; attempt <= retries; attempt++) {
       try {
@@ -743,7 +743,7 @@ const Dashboard = memo(() => {
                 </p>
                 {showChainExplorer && (
                   <p className="text-xs mt-1" style={{ color: THEME.accent }}>
-                    📡 Loading from: http://83.229.83.184:8000/chain
+                    📡 Loading from: https://threeheads.it/chain
                   </p>
                 )}
               </div>
@@ -804,7 +804,7 @@ const Dashboard = memo(() => {
                       Loading chain data...
                     </p>
                     <p className="text-xs mt-1" style={{ color: THEME.textMuted }}>
-                      Fetching from http://83.229.83.184:8000/chain
+                      Fetching from https://threeheads.it/chain
                     </p>
                   </div>
                 ) : chainData ? (

@@ -2,6 +2,5 @@
 include ':capacitor-android'
 project(':capacitor-android').projectDir = new File('../node_modules/@capacitor/android/capacitor')
 
-// Temporarily disabled - plugin has compilation errors and is not used in the app
-// include ':capacitor-http'
+// include ':capacitor-http' // Disabled - causes compilation errors
 // project(':capacitor-http').projectDir = new File('../node_modules/@capacitor/http/android')

@@ -9,24 +9,8 @@ import { Capacitor } from '@capacitor/core';
 
 const PRIVATE_KEY_STORAGE_KEY = 'ticket_private_keys';
 
-// Detect platform and use appropriate API URL
-// Web (HTTPS): Use proxy to avoid mixed content issues (HTTPS can't call HTTP)
-// Android: Use direct blockchain server (no mixed content restrictions in native apps)
-const isAndroid = Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'android';
-const isWeb = !isAndroid;
-
-const getApiBaseUrl = () => {
-  if (isAndroid) {
-    // Android: Direct connection to blockchain server
-    return 'http://83.229.83.184:8000';
-  }
-  
-  // Web: Use proxy to avoid mixed content (HTTPS -> HTTP is blocked by browsers)
-  // The proxy server handles the HTTP connection to blockchain server
-  return '/api';
-};
-
-const API_BASE_URL = getApiBaseUrl();
+// API is now HTTPS - same URL works for both web and Android
+const API_BASE_URL = 'https://threeheads.it';
 
 /**
  * Generate Ed25519 key pair
@@ -197,6 +181,103 @@ export function verifySignature(publicKey, payload, signatureHex) {
 }
 
 /**
+ * Create signature message for ticket validation
+ * Message format: Public Key (32 bytes) + Signature (64 bytes) = 96 bytes total
+ * Challenge is always "autism"
+ * @param {string} ticketId - Ticket ID (public key hex string)
+ * @returns {Promise<string>} Hex string of the message (192 hex chars = 96 bytes)
+ */
+export async function createTicketSignatureMessage(ticketId) {
+  try {
+    // Get the private key for this ticket
+    const privateKey = getStoredPrivateKey(ticketId);
+    if (!privateKey) {
+      throw new Error(`Private key not found for ticket: ${ticketId.substring(0, 16)}...`);
+    }
+
+    // Convert ticketId (hex string) to public key (Uint8Array)
+    const publicKey = new Uint8Array(
+      ticketId.match(/.{1,2}/g).map(byte => parseInt(byte, 16))
+    );
+
+    // Challenge is always "autism"
+    const challenge = 'autism';
+    const challengeBytes = new TextEncoder().encode(challenge);
+
+    // Sign the challenge with the private key
+    const signature = nacl.sign.detached(challengeBytes, privateKey);
+
+    // Create message: Public Key (32 bytes) + Signature (64 bytes) = 96 bytes
+    const message = new Uint8Array(96);
+    message.set(publicKey, 0);        // First 32 bytes: public key
+    message.set(signature, 32);        // Next 64 bytes: signature
+
+    // Convert to hex string for NFC transmission
+    const messageHex = Array.from(message)
+      .map(b => b.toString(16).padStart(2, '0'))
+      .join('');
+
+    console.log('✅ Signature message created:', {
+      ticketId: ticketId.substring(0, 16) + '...',
+      publicKeyLength: publicKey.length,
+      signatureLength: signature.length,
+      messageLength: message.length,
+      messageHexLength: messageHex.length,
+    });
+
+    return messageHex;
+  } catch (error) {
+    console.error('❌ Error creating signature message:', error);
+    throw error;
+  }
+}
+
+/**
+ * Verify ticket signature message
+ * @param {string} messageHex - Hex string of message (192 hex chars = 96 bytes)
+ * @returns {boolean} True if signature is valid
+ */
+export function verifyTicketSignatureMessage(messageHex) {
+  try {
+    const PUBLIC_KEY_LENGTH = 32; // Ed25519 Public Key is 32 bytes
+    const SIGNATURE_LENGTH = 64;  // Ed25519 Signature is 64 bytes
+    const EXPECTED_MESSAGE_LENGTH = PUBLIC_KEY_LENGTH + SIGNATURE_LENGTH; // 96 bytes = 192 hex chars
+
+    // Convert hex string to Uint8Array
+    const message = new Uint8Array(
+      messageHex.match(/.{1,2}/g).map(byte => parseInt(byte, 16))
+    );
+
+    // Check if the message length is correct (96 bytes = 192 hex chars)
+    if (message.length !== EXPECTED_MESSAGE_LENGTH) {
+      console.error('Invalid message length:', message.length, 'expected', EXPECTED_MESSAGE_LENGTH);
+      return false;
+    }
+
+    // Extract public key and signature from the message
+    const publicKeyBytes = message.subarray(0, PUBLIC_KEY_LENGTH);
+    const signature = message.subarray(PUBLIC_KEY_LENGTH);
+
+    // Challenge is always "autism"
+    const challenge = 'autism';
+    const challengeBytes = new TextEncoder().encode(challenge);
+
+    // Verify signature using TweetNaCl
+    const isValid = nacl.sign.detached.verify(challengeBytes, signature, publicKeyBytes);
+
+    console.log('🔍 Signature verification:', {
+      isValid,
+      publicKeyHex: Array.from(publicKeyBytes).map(b => b.toString(16).padStart(2, '0')).join('').substring(0, 16) + '...',
+    });
+
+    return isValid;
+  } catch (error) {
+    console.error('❌ Error verifying ticket signature message:', error);
+    return false;
+  }
+}
+
+/**
  * Store private key in localStorage
  * @param {string} ticketId - Ticket ID (public key hex)
  * @param {Uint8Array} privateKey - Private key to store
@@ -318,119 +399,80 @@ export async function submitMintTransaction({ ticketId, payload, signature }) {
     console.log('📤 Full transaction JSON:', transactionJson);
     console.log('📤 Payload being signed:', JSON.stringify(payload));
     
-    // Use the same XMLHttpRequest approach for both Android and Web
     const submitUrl = `${API_BASE_URL}/submit`;
     console.log('📤 Submitting to URL:', submitUrl);
     
-    // Use XMLHttpRequest - works the same on both Android and Web
-    const response = await new Promise((resolve, reject) => {
-      const xhr = new XMLHttpRequest();
+    // Use standard fetch() with HTTPS - normal API request
+    try {
+      const response = await fetch(submitUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
+        body: JSON.stringify(transaction),
+      });
       
-      try {
-        xhr.open('POST', submitUrl, true);
-        xhr.setRequestHeader('Content-Type', 'application/json');
-        xhr.setRequestHeader('Accept', 'application/json');
-      } catch (openError) {
-        const errorMsg = `Failed to open request: ${openError?.message || String(openError)}`;
-        console.error('❌ XHR open error:', errorMsg);
-        reject(new Error(errorMsg));
-        return;
+      console.log(`📥 Response status: ${response.status}`);
+      console.log(`📥 Response ok: ${response.ok}`);
+      
+      const responseText = await response.text();
+      console.log(`📥 Response text length: ${responseText.length}`);
+      console.log(`📥 Response text (first 500 chars):`, responseText.substring(0, 500));
+      
+      if (!response.ok) {
+        // Try to parse error message
+        let errorMessage = `HTTP error! status: ${response.status}`;
+        try {
+          if (responseText) {
+            const errorJson = JSON.parse(responseText);
+            errorMessage += `, message: ${JSON.stringify(errorJson)}`;
+          } else {
+            errorMessage += `, empty response body`;
+          }
+        } catch (e) {
+          errorMessage += `, response: ${responseText.substring(0, 200)}`;
+        }
+        console.error('❌ Submit failed:', errorMessage);
+        throw new Error(errorMessage);
       }
       
-      xhr.onload = function() {
-        const responseText = xhr.responseText || '';
-        const status = xhr.status || 0;
-        console.log(`📥 Response status: ${status}`);
-        console.log(`📥 Response text length: ${responseText.length}`);
-        console.log(`📥 Response text (first 500 chars):`, responseText.substring(0, 500));
-        
-        if (status >= 200 && status < 300) {
-          // Check if we got HTML instead of JSON (proxy not working)
-          if (responseText.trim().startsWith('<!DOCTYPE') || responseText.trim().startsWith('<html')) {
-            console.error('❌ Received HTML instead of JSON. Response:', responseText.substring(0, 200));
-            reject(new Error('Server returned HTML instead of JSON. Proxy may not be working.'));
-            return;
-          }
-          
-          try {
-            const json = JSON.parse(responseText);
-            resolve({
-              ok: true,
-              status: status,
-              json: async () => json,
-              text: async () => responseText,
-            });
-          } catch (e) {
-            console.error('❌ Failed to parse JSON. Response:', responseText.substring(0, 200));
-            reject(new Error('Failed to parse JSON response: ' + (e?.message || String(e))));
-          }
-        } else {
-          // Even on error, try to parse JSON to get error message
-          let errorMessage = `HTTP error! status: ${status}`;
-          try {
-            if (responseText) {
-              const errorJson = JSON.parse(responseText);
-              errorMessage += `, message: ${JSON.stringify(errorJson)}`;
-            } else {
-              errorMessage += `, empty response body`;
-            }
-          } catch (e) {
-            errorMessage += `, response: ${responseText.substring(0, 200)}`;
-          }
-          console.error('❌ Submit failed:', errorMessage);
-          reject(new Error(errorMessage));
-        }
-      };
-      
-      xhr.onerror = function(event) {
-        // Provide helpful error message
-        let errorMsg = `Network error: Cannot connect to ${submitUrl}.`;
-        if (submitUrl.startsWith('/api')) {
-          errorMsg += ' Make sure the dev server is running (npm run server) and accessible from your device.';
-        } else {
-          errorMsg += ' Check your internet connection and ensure the server is reachable.';
-        }
-        console.error('❌ XHR onerror:', errorMsg, {
-          status: xhr.status,
-          readyState: xhr.readyState,
-          responseText: xhr.responseText?.substring(0, 200),
-          event: event,
-          url: submitUrl
-        });
-        reject(new Error(errorMsg));
-      };
-      
-      xhr.ontimeout = function() {
-        const errorMsg = `Request timeout: Server did not respond within 30 seconds.`;
-        console.error('❌ XHR timeout:', errorMsg);
-        reject(new Error(errorMsg));
-      };
-      
-      xhr.onabort = function() {
-        const errorMsg = `Request aborted: The request was cancelled.`;
-        console.error('❌ XHR aborted:', errorMsg);
-        reject(new Error(errorMsg));
-      };
-      
-      xhr.timeout = 30000; // 30 seconds
-      
-      try {
-        xhr.send(JSON.stringify(transaction));
-      } catch (sendError) {
-        const errorMsg = `Failed to send request: ${sendError?.message || String(sendError)}`;
-        console.error('❌ XHR send error:', errorMsg);
-        reject(new Error(errorMsg));
+      // Check if we got HTML instead of JSON
+      if (responseText.trim().startsWith('<!DOCTYPE') || responseText.trim().startsWith('<html')) {
+        console.error('❌ Received HTML instead of JSON. Response:', responseText.substring(0, 200));
+        throw new Error('Server returned HTML instead of JSON. Please check the API endpoint.');
       }
-    });
-    
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`HTTP error! status: ${response.status}, message: ${errorText}`);
+      
+      // Parse JSON response
+      let data;
+      try {
+        data = JSON.parse(responseText);
+      } catch (e) {
+        console.error('❌ Failed to parse JSON. Response:', responseText.substring(0, 200));
+        throw new Error('Failed to parse JSON response: ' + (e?.message || String(e)));
+      }
+      
+      console.log('✅ MINT transaction submitted successfully:', data);
+      return data;
+    } catch (fetchError) {
+      // Provide helpful error message
+      let errorMsg = `Network error: Cannot connect to ${submitUrl}.`;
+      
+      if (fetchError.name === 'TypeError' && fetchError.message.includes('Failed to fetch')) {
+        errorMsg += ' This could be due to: CORS issue, SSL certificate error, or network connectivity problem.';
+      } else if (fetchError.message) {
+        errorMsg = fetchError.message;
+      }
+      
+      console.error('❌ Fetch error:', errorMsg, {
+        error: fetchError,
+        name: fetchError.name,
+        message: fetchError.message,
+        stack: fetchError.stack,
+        url: submitUrl
+      });
+      throw new Error(errorMsg);
     }
-    
-    const data = await response.json();
-    console.log('✅ MINT transaction submitted successfully:', data);
-    return data;
   } catch (error) {
     // Ensure error has a message
     const errorMessage = error?.message || error?.toString() || String(error) || 'Unknown error occurred';

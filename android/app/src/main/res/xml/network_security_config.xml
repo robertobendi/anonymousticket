@@ -1,15 +1,31 @@
 <?xml version="1.0" encoding="utf-8"?>
 <network-security-config>
-    <!-- Allow ALL cleartext traffic - NO SECURITY RESTRICTIONS -->
+    <!-- Allow ALL traffic - NO SECURITY RESTRICTIONS -->
+    <!-- Trust all certificates (including self-signed) for HTTPS -->
     <base-config cleartextTrafficPermitted="true">
+        <trust-anchors>
+            <!-- Trust system certificates -->
+            <certificates src="system" />
+            <!-- Trust user-installed certificates -->
+            <certificates src="user" />
+        </trust-anchors>
+    </base-config>
+    <!-- Explicitly allow blockchain server - both HTTP and HTTPS -->
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="true">threeheads.it</domain>
+        <trust-anchors>
+            <!-- Trust all certificates for this domain (including self-signed) -->
+            <certificates src="system" />
+            <certificates src="user" />
+        </trust-anchors>
+    </domain-config>
+    <!-- Legacy domain support -->
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="true">83.229.83.184</domain>
         <trust-anchors>
             <certificates src="system" />
             <certificates src="user" />
         </trust-anchors>
-    </base-config>
-    <!-- Explicitly allow blockchain server -->
-    <domain-config cleartextTrafficPermitted="true">
-        <domain includeSubdomains="true">83.229.83.184</domain>
     </domain-config>
 </network-security-config>
 

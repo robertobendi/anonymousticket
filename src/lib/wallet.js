@@ -99,6 +99,31 @@ export function getWalletForNFC() {
 }
 
 /**
+ * Get single ticket formatted for NFC transmission
+ * Returns signature message (public key + signature) for validation
+ * @param {Object} ticket - Ticket object to share
+ * @returns {Promise<string>} Hex string of signature message (192 hex chars)
+ */
+export async function getTicketForNFC(ticket) {
+  if (!ticket) {
+    return null;
+  }
+  
+  const ticketId = ticket.ticketId || ticket.id;
+  if (!ticketId) {
+    throw new Error('Ticket ID is required for NFC sharing');
+  }
+
+  // Import the function to create signature message
+  const { createTicketSignatureMessage } = await import('@lib/crypto');
+  
+  // Create signature message: Public Key (32 bytes) + Signature (64 bytes)
+  const messageHex = await createTicketSignatureMessage(ticketId);
+  
+  return messageHex;
+}
+
+/**
  * React hook for wallet management
  * @returns {[Array<Object>, function, function, function]} [tickets, addTicket, removeTicket, clearWallet]
  */

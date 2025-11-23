@@ -702,6 +702,16 @@ export async function writeNFC(data) {
  */
 export function parseNFCTicketData(nfcData) {
   try {
+    // Check if this is a signature message (192 hex chars = 96 bytes)
+    // Signature message format: Public Key (32 bytes) + Signature (64 bytes) = 96 bytes = 192 hex chars
+    const trimmedData = nfcData.trim();
+    if (/^[0-9a-fA-F]{192}$/.test(trimmedData)) {
+      return {
+        type: 'signature_message',
+        messageHex: trimmedData,
+      };
+    }
+    
     // Try to parse as wallet JSON format first (contains tickets array)
     const parsed = JSON.parse(nfcData);
     if (parsed.wallet && Array.isArray(parsed.tickets)) {
@@ -730,7 +740,16 @@ export function parseNFCTicketData(nfcData) {
     
     return null;
   } catch (error) {
-    // If JSON parse fails, try QR code format
+    // If JSON parse fails, check if it's a signature message
+    const trimmedData = nfcData.trim();
+    if (/^[0-9a-fA-F]{192}$/.test(trimmedData)) {
+      return {
+        type: 'signature_message',
+        messageHex: trimmedData,
+      };
+    }
+    
+    // Try QR code format
     try {
       const parts = nfcData.split('|');
       if (parts.length >= 2) {

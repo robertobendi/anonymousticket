@@ -5,6 +5,7 @@ import { FiRadio, FiCheckCircle, FiXCircle, FiAlertCircle, FiRefreshCw, FiArrowL
 import { checkNFC, startReading, requestNFCPermission } from '@lib/nfc-simple';
 import { parseNFCTicketData } from '@lib/nfc';
 import { verifyTicket, parseQRCodeData } from '@lib/ticketGenerator';
+import { verifyTicketSignatureMessage } from '@lib/crypto';
 import { THEME } from '@lib/themeColors';
 import AnimatedCard from '@components/ui/AnimatedCard';
 import AnimatedButton from '@components/ui/AnimatedButton';
@@ -124,6 +125,31 @@ const Verify = memo(() => {
         // Navigate to ReceivedTickets page with wallet data
         navigate('/received', { state: { walletData: parsedData } });
         setIsReading(false);
+        return;
+      }
+      
+      // Check if this is a signature message (for ticket validation)
+      if (parsedData && parsedData.type === 'signature_message' && parsedData.messageHex) {
+        console.log('Signature message detected, verifying...');
+        const isValid = verifyTicketSignatureMessage(parsedData.messageHex);
+        
+        // Extract public key from message for display
+        const publicKeyHex = parsedData.messageHex.substring(0, 64); // First 64 hex chars = 32 bytes
+        
+        await setVerificationResultWithCooldown({
+          valid: isValid,
+          message: isValid 
+            ? 'Ticket signature verified successfully. Challenge "autism" validated.' 
+            : 'Ticket signature verification failed. Invalid signature or corrupted data.',
+          ticketId: publicKeyHex,
+          controlCode: null,
+          origin: null,
+          destination: null,
+          date: null,
+          rawTagId: tagId,
+          rawData: ticketDataString,
+          isSignatureVerification: true,
+        });
         return;
       }
       
@@ -416,7 +442,9 @@ const Verify = memo(() => {
               )}
               <div className="flex-1 min-w-0">
                 <h2 className="text-lg sm:text-xl font-bold mb-1" style={{ color: THEME.text, lineHeight: '1.2' }}>
-                  {verificationResult.valid ? 'Ticket Valid' : 'Ticket Invalid'}
+                  {verificationResult.isSignatureVerification 
+                    ? (verificationResult.valid ? 'Signature Verified ✓' : 'Signature Invalid ✗')
+                    : (verificationResult.valid ? 'Ticket Valid' : 'Ticket Invalid')}
                 </h2>
                 <p className="text-xs sm:text-sm leading-relaxed" style={{ color: THEME.textMuted }}>
                   {verificationResult.message}
