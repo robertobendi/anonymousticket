@@ -5,8 +5,6 @@ import { FiArrowLeft, FiBarChart2, FiTrendingUp, FiCheckCircle, FiShield, FiDoll
 import { THEME } from '@lib/themeColors';
 import AnimatedCard from '@components/ui/AnimatedCard';
 
-// Removed mock data - only show real data from API
-
 const StatsHistory = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -17,33 +15,25 @@ const StatsHistory = () => {
   // Fetch logic
   useEffect(() => {
     const fetchChainData = async (retries = 3) => {
-      const apiUrl = '/api/chain';
+      const apiUrl = 'https://threeheads.it/chain';
       
       for (let attempt = 1; attempt <= retries; attempt++) {
         try {
           setIsLoading(true);
-          let data;
           
-          data = await new Promise((resolve, reject) => {
-            const xhr = new XMLHttpRequest();
-            xhr.open('GET', apiUrl, true);
-            xhr.setRequestHeader('Accept', 'application/json');
-            xhr.onload = function() {
-              if (xhr.status >= 200 && xhr.status < 300) {
-                try {
-                  resolve(JSON.parse(xhr.responseText));
-                } catch (e) {
-                  reject(new Error('Failed to parse JSON: ' + e.message));
-                }
-              } else {
-                reject(new Error(`HTTP error! status: ${xhr.status}`));
-              }
-            };
-            xhr.onerror = () => reject(new Error('Network error'));
-            xhr.ontimeout = () => reject(new Error('Request timeout'));
-            xhr.timeout = 30000;
-            xhr.send();
+          // Use fetch for better error handling and consistency
+          const response = await fetch(apiUrl, {
+            method: 'GET',
+            headers: {
+              'Accept': 'application/json',
+            },
           });
+          
+          if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+          }
+          
+          const data = await response.json();
 
           if (data.success && data.data) {
             setChainData(data.data);
@@ -85,15 +75,22 @@ const StatsHistory = () => {
   const chartData = useMemo(() => {
     if (!chainData || !chainData.blocks) return [];
 
-    // Group by hour
-    const hourlyData = {};
+    // Group by 15-minute intervals
+    const intervalData = {};
     const now = new Date();
+    const nowTs = now.getTime();
     
-    // Initialize last 24 hours with 0
-    for (let i = 0; i < 24; i++) {
-      const d = new Date(now);
-      d.setHours(now.getHours() - i, 0, 0, 0);
-      hourlyData[d.getTime()] = 0;
+    // Initialize last 24 hours with 0 (every 15 mins = 24 * 4 = 96 intervals)
+    const intervalMs = 15 * 60 * 1000;
+    const steps = 24 * 4;
+
+    for (let i = 0; i < steps; i++) {
+      const d = new Date(nowTs - (i * intervalMs));
+      // Round down to nearest 15 min
+      const minutes = d.getMinutes();
+      const roundedMinutes = Math.floor(minutes / 15) * 15;
+      d.setMinutes(roundedMinutes, 0, 0);
+      intervalData[d.getTime()] = 0;
     }
 
     chainData.blocks.forEach(block => {
@@ -101,7 +98,10 @@ const StatsHistory = () => {
         block.transactions.forEach(tx => {
           const txTimestamp = tx.payload?.timestamp || block.timestamp;
           const txDate = new Date(txTimestamp);
-          txDate.setMinutes(0, 0, 0);
+          // Round down to nearest 15 min
+          const minutes = txDate.getMinutes();
+          const roundedMinutes = Math.floor(minutes / 15) * 15;
+          txDate.setMinutes(roundedMinutes, 0, 0);
           const key = txDate.getTime();
 
           let match = false;
@@ -116,13 +116,16 @@ const StatsHistory = () => {
           }
 
           if (match) {
-            hourlyData[key] = (hourlyData[key] || 0) + value;
+            // Only count if within the initialized range
+            if (intervalData.hasOwnProperty(key)) {
+               intervalData[key] += value;
+            }
           }
         });
       }
     });
 
-    return Object.entries(hourlyData)
+    return Object.entries(intervalData)
       .sort(([a], [b]) => Number(a) - Number(b))
       .map(([ts, value]) => ({
         timestamp: Number(ts),
@@ -206,11 +209,11 @@ const StatsHistory = () => {
           </div>
 
           {/* X Axis Labels (Below chart) */}
-          <div className="flex pl-12 mt-4"> {/* Added mt-4 for spacing */}
+          <div className="flex pl-12 mt-4 overflow-hidden"> {/* Added overflow-hidden */}
             {chartData.map((item, index) => (
               <div key={item.timestamp} className="flex-1 text-center">
-                <span className="text-[10px] block whitespace-nowrap" style={{ color: THEME.textMuted }}>
-                  {index % 3 === 0 ? item.label : ''}
+                <span className="text-[10px] block whitespace-nowrap mt-2" style={{ color: THEME.textMuted, fontSize: '10px' }}>
+                  {index % 8 === 0 ? item.label : ''}
                 </span>
               </div>
             ))}
