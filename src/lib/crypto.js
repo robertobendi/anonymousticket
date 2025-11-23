@@ -536,10 +536,21 @@ export async function submitInspectTransaction({ ticketId, location, timestamp, 
       deviceId: deviceId,
     };
 
-    // Sign payload with scanner's private key
-    console.log('✍️ Signing INSPECT payload with scanner key...');
-    const signature = signPayload(scannerPrivateKey, payload);
-    console.log('✅ INSPECT payload signed. Signature length:', signature.length, 'hex chars');
+    // Create the message to sign: {type, ticketId, payload}
+    // The server expects signature over the entire transaction (minus signature field)
+    const messageToSign = {
+      type: 'INSPECT',
+      ticketId: ticketId,
+      payload: payload,
+    };
+
+    console.log('📝 INSPECT message to sign:', JSON.stringify(messageToSign));
+    console.log('📝 Payload inside message:', JSON.stringify(payload));
+
+    // Sign the entire message (type + ticketId + payload) with scanner's private key
+    console.log('✍️ Signing INSPECT message (type + ticketId + payload) with scanner key...');
+    const signature = signPayload(scannerPrivateKey, messageToSign);
+    console.log('✅ INSPECT message signed. Signature length:', signature.length, 'hex chars');
 
     const transaction = {
       type: 'INSPECT',
@@ -760,32 +771,56 @@ export async function recordAuditLog(ticketId, location = 'Train IC-1 (Scanner A
       
       // 2. Prepare payload
       const payload = {
-        type: 'INSPECT',
         location: location,
         timestamp: Date.now(),
         deviceId: 'POLICE_MOBILE_UNIT'
       };
       
-      // 3. Sign payload
-      const signature = signPayload(scannerPrivateKey, payload);
-      console.log('✅ Payload signed');
+      // 3. Create the message to sign: {type, ticketId, payload}
+      // The server expects signature over the entire transaction (minus signature field)
+      const messageToSign = {
+        type: 'INSPECT',
+        ticketId: ticketId,
+        payload: payload,
+      };
       
-      // 4. Send to blockchain (fire & forget)
+      console.log('📝 INSPECT message to sign:', JSON.stringify(messageToSign));
+      console.log('📝 Payload inside message:', JSON.stringify(payload));
+      
+      // 4. Sign the entire message (type + ticketId + payload)
+      const signature = signPayload(scannerPrivateKey, messageToSign);
+      console.log('✅ Message signed. Signature length:', signature.length, 'hex chars');
+      
+      // 5. Send to blockchain (fire & forget)
       const submitUrl = `${API_BASE_URL}/submit`;
+      const transaction = {
+        type: 'INSPECT',
+        ticketId: ticketId, // Passenger's ticket ID
+        payload: payload,
+        signature: signature,
+      };
+      
+      console.log('📤 Sending INSPECT transaction:', {
+        type: transaction.type,
+        ticketId: ticketId.substring(0, 16) + '...',
+        payload: payload,
+        signatureLength: signature.length
+      });
+      
       fetch(submitUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Accept': 'application/json',
         },
-        body: JSON.stringify({
-          type: 'INSPECT',
-          ticketId: ticketId, // Passenger's ticket ID
-          payload: payload,
-          signature: signature,
-        }),
-      }).then(() => {
-        console.log('📸 Inspection mined on-chain.');
+        body: JSON.stringify(transaction),
+      }).then(async (response) => {
+        const responseText = await response.text();
+        if (response.ok) {
+          console.log('📸 Inspection mined on-chain.');
+        } else {
+          console.warn('⚠️ Audit log failed:', response.status, responseText);
+        }
       }).catch((e) => {
         console.warn('⚠️ Audit log failed (UI unaffected):', e);
       });
