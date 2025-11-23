@@ -2,10 +2,11 @@ import { useState, useEffect, memo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import toast from 'react-hot-toast';
-import { FiArrowLeft, FiTrash2, FiCreditCard, FiGlobe, FiAlertCircle, FiMenu, FiRadio } from 'react-icons/fi';
+import { FiArrowLeft, FiTrash2, FiCreditCard, FiGlobe, FiAlertCircle, FiMenu, FiRadio, FiPlay, FiCheckCircle } from 'react-icons/fi';
 import { useWallet, getTicketForNFC } from '@lib/wallet';
 import { startBeacon, stopBeacon } from '@lib/nfc-simple';
 import { checkNFC } from '@lib/nfc-simple';
+import { activateTicket, getStoredPrivateKey, checkTicketStatus } from '@lib/crypto';
 import { THEME } from '@lib/themeColors';
 import AnimatedCard from '@components/ui/AnimatedCard';
 import AnimatedButton from '@components/ui/AnimatedButton';
@@ -21,6 +22,8 @@ const Wallet = memo(() => {
   const [nfcAvailable, setNfcAvailable] = useState(false);
   const [sharingTicketId, setSharingTicketId] = useState(null); // Track which ticket is being shared
   const [shareError, setShareError] = useState(null);
+  const [activatingTicketId, setActivatingTicketId] = useState(null); // Track which ticket is being activated
+  const [ticketStatuses, setTicketStatuses] = useState({}); // Track status for each ticket: { ticketId: 'ACTIVE' | 'ISSUED' | 'EXPIRED' | 'UNKNOWN' }
 
   useEffect(() => {
     // Check NFC availability
@@ -37,6 +40,41 @@ const Wallet = memo(() => {
     };
     checkNFCStatus();
   }, []);
+
+  // Check ticket statuses when tickets change
+  useEffect(() => {
+    const checkStatuses = async () => {
+      if (tickets.length === 0) return;
+      
+      const statusPromises = tickets.map(async (ticket) => {
+        const ticketId = ticket.id || ticket.ticketId;
+        if (!ticketId) return null;
+        
+        try {
+          const statusResult = await checkTicketStatus(ticketId);
+          if (statusResult.success && statusResult.data) {
+            return { ticketId, status: statusResult.data.status || 'UNKNOWN' };
+          }
+          return { ticketId, status: 'UNKNOWN' };
+        } catch (error) {
+          console.warn('Error checking status for ticket:', ticketId, error);
+          return { ticketId, status: 'UNKNOWN' };
+        }
+      });
+      
+      const results = await Promise.all(statusPromises);
+      const statusMap = {};
+      results.forEach((result) => {
+        if (result) {
+          statusMap[result.ticketId] = result.status;
+        }
+      });
+      
+      setTicketStatuses(statusMap);
+    };
+    
+    checkStatuses();
+  }, [tickets]);
 
   /**
    * Handle sharing a single ticket via NFC using Host Card Emulation (HCE)
@@ -118,6 +156,69 @@ const Wallet = memo(() => {
       toast.error(errorMsg, {
         duration: 5000,
       });
+    }
+  };
+
+  /**
+   * Handle activating a ticket
+   * Activates ticket on blockchain (changes status from ISSUED to ACTIVE)
+   * @param {Object} ticket - Ticket to activate
+   */
+  const handleActivateTicket = async (ticket) => {
+    if (activatingTicketId === ticket.id) {
+      return; // Already activating
+    }
+
+    setActivatingTicketId(ticket.id);
+    
+    try {
+      const ticketId = ticket.id || ticket.ticketId;
+      if (!ticketId) {
+        throw new Error('Ticket ID not found');
+      }
+
+      // Get user's private key for this ticket
+      const privateKey = getStoredPrivateKey(ticketId);
+      if (!privateKey) {
+        throw new Error('Private key not found for this ticket. Cannot activate.');
+      }
+
+      // Get location from ticket or use default
+      const location = ticket.origin || 'Unknown Station';
+      
+      toast.loading('Activating ticket...', {
+        id: 'activate-ticket',
+        duration: 10000,
+      });
+
+      // Activate ticket on blockchain
+      const result = await activateTicket(ticketId, privateKey, location);
+      
+      toast.dismiss('activate-ticket');
+      
+      if (result.success) {
+        // Update status immediately
+        setTicketStatuses(prev => ({
+          ...prev,
+          [ticketId]: 'ACTIVE'
+        }));
+        
+        toast.success('Ticket activated! Have a nice trip! 🚂', {
+          icon: '✅',
+          duration: 4000,
+        });
+      } else {
+        throw new Error(result.error || 'Activation failed');
+      }
+    } catch (error) {
+      console.error('Activation error:', error);
+      toast.dismiss('activate-ticket');
+      toast.error(error.message || 'Failed to activate ticket', {
+        icon: '❌',
+        duration: 5000,
+      });
+    } finally {
+      setActivatingTicketId(null);
     }
   };
 
@@ -217,27 +318,74 @@ const Wallet = memo(() => {
             </AnimatedCard>
           ) : (
             <div className="space-y-4">
-              {tickets.map((ticket, index) => (
+              {tickets.map((ticket, index) => {
+                const ticketId = ticket.id || ticket.ticketId;
+                const status = ticketStatuses[ticketId] || 'UNKNOWN';
+                const isActive = status === 'ACTIVE';
+                const isExpired = status === 'EXPIRED';
+                const isIssued = status === 'ISSUED';
+                
+                // Determine border color based on status
+                let borderColor = THEME.border;
+                if (isActive) {
+                  borderColor = THEME.success;
+                } else if (isExpired) {
+                  borderColor = '#ff9800';
+                } else if (isIssued) {
+                  borderColor = THEME.accent;
+                }
+                
+                return (
                 <AnimatedCard
                   key={ticket.id}
                   delay={index * 0.1}
-                  className="p-4 rounded-lg"
-                  style={{ backgroundColor: THEME.card, border: `2px solid ${THEME.border}`, borderRadius: '8px' }}
+                  className="p-4 sm:p-5 rounded-lg relative overflow-hidden"
+                  style={{ 
+                    backgroundColor: THEME.card, 
+                    border: `1px solid ${THEME.border}`, 
+                    borderRadius: '12px',
+                    borderLeft: `4px solid ${borderColor}`
+                  }}
                   whileHover={{ scale: 1.01 }}
                 >
-                <div className="flex items-start justify-between gap-4">
+                  {/* Subtle Status Indicator - Top Right */}
+                  {status !== 'UNKNOWN' && (
+                    <div 
+                      className="absolute top-3 right-3 flex items-center gap-1.5"
+                    >
+                      {isActive && (
+                        <div 
+                          className="w-2 h-2 rounded-full"
+                          style={{ backgroundColor: THEME.success }}
+                        />
+                      )}
+                      <span 
+                        className="text-xs font-medium"
+                        style={{
+                          color: isActive ? THEME.success : 
+                                 isExpired ? '#ff9800' :
+                                 THEME.textMuted
+                        }}
+                      >
+                        {isActive ? 'Active' : 
+                         isExpired ? 'Expired' :
+                         isIssued ? 'Issued' : ''}
+                      </span>
+                    </div>
+                  )}
+                <div className="flex items-start justify-between gap-3 sm:gap-4 pr-16 sm:pr-20">
                   <div className="flex-1">
                     {ticket.type === 'pass' ? (
                       <>
-                        <div className="flex items-center gap-2 mb-2">
-                          <FiGlobe style={{ color: THEME.accent }} size={18} />
-                          <h3 className="text-lg font-bold" style={{ color: THEME.text }}>
+                        <div className="flex items-center gap-2 mb-3">
+                          <FiGlobe style={{ color: THEME.accent }} size={16} />
+                          <h3 className="text-base sm:text-lg font-bold" style={{ color: THEME.text }}>
                             {ticket.passType === 'countrywide' ? 'Switzerland Pass' :
                              ticket.passType === 'daily' ? 'Daily Pass' :
                              ticket.passType === 'weekly' ? 'Weekly Pass' : 'Monthly Pass'}
                           </h3>
                         </div>
-                        <div className="grid grid-cols-2 gap-3 text-sm mb-2">
+                        <div className="grid grid-cols-2 gap-2 sm:gap-3 text-xs sm:text-sm mb-2">
                           <div>
                             <div style={{ color: THEME.textMuted }}>Valid From</div>
                             <div className="font-bold" style={{ color: THEME.text }}>
@@ -254,13 +402,13 @@ const Wallet = memo(() => {
                       </>
                     ) : (
                       <>
-                        <div className="flex items-center gap-2 mb-2">
-                          <FiCreditCard style={{ color: THEME.accent }} size={18} />
-                          <h3 className="text-lg font-bold" style={{ color: THEME.text }}>
+                        <div className="flex items-center gap-2 mb-3">
+                          <FiCreditCard style={{ color: THEME.accent }} size={16} />
+                          <h3 className="text-base sm:text-lg font-bold" style={{ color: THEME.text }}>
                             {ticket.origin} → {ticket.destination}
                           </h3>
                         </div>
-                        <div className="grid grid-cols-2 gap-3 text-sm mb-2">
+                        <div className="grid grid-cols-2 gap-2 sm:gap-3 text-xs sm:text-sm mb-2">
                           <div>
                             <div style={{ color: THEME.textMuted }}>Date</div>
                             <div className="font-bold" style={{ color: THEME.text }}>
@@ -304,27 +452,60 @@ const Wallet = memo(() => {
                       </div>
                     )}
                   </div>
-                  <div className="flex flex-col gap-2">
+                  <div className="flex flex-col gap-2 min-w-[100px] sm:min-w-[120px]">
+                    <motion.button
+                      onClick={() => handleActivateTicket(ticket)}
+                      disabled={activatingTicketId === ticket.id || isActive}
+                      className="px-3 sm:px-4 py-2.5 min-h-[44px] flex items-center justify-center gap-1.5 text-xs sm:text-sm font-semibold rounded-lg shadow-sm"
+                      style={{ 
+                        backgroundColor: isActive ? `${THEME.success}30` : THEME.success,
+                        color: isActive ? THEME.success : '#ffffff',
+                        opacity: (activatingTicketId === ticket.id || !isActive) ? (activatingTicketId === ticket.id ? 0.6 : 1) : 0.7
+                      }}
+                      whileHover={activatingTicketId !== ticket.id && !isActive ? { opacity: 0.9, scale: 1.02 } : {}}
+                      whileTap={activatingTicketId !== ticket.id && !isActive ? { scale: 0.98 } : {}}
+                      aria-label="Activate ticket"
+                    >
+                      {activatingTicketId === ticket.id ? (
+                        <>
+                          <FiPlay size={12} />
+                          <span>Activating...</span>
+                        </>
+                      ) : isActive ? (
+                        <>
+                          <FiCheckCircle size={12} />
+                          <span>Active</span>
+                        </>
+                      ) : (
+                        <>
+                          <FiPlay size={12} />
+                          <span>Activate</span>
+                        </>
+                      )}
+                    </motion.button>
                     <motion.button
                       onClick={() => handleShareTicket(ticket)}
                       disabled={!nfcAvailable}
-                      className="px-3 py-2 min-h-[44px] flex items-center justify-center gap-2 text-xs font-bold rounded"
+                      className="px-3 sm:px-4 py-2.5 min-h-[44px] flex items-center justify-center gap-1.5 text-xs sm:text-sm font-semibold rounded-lg shadow-sm"
                       style={{ 
-                        backgroundColor: sharingTicketId === ticket.id ? THEME.success : THEME.accent,
+                        backgroundColor: sharingTicketId === ticket.id ? THEME.accent : `${THEME.accent}90`,
                         color: '#ffffff',
                         opacity: !nfcAvailable ? 0.5 : 1
                       }}
-                      whileHover={nfcAvailable ? { opacity: 0.8, scale: 1.05 } : {}}
-                      whileTap={nfcAvailable ? { scale: 0.95 } : {}}
+                      whileHover={nfcAvailable ? { opacity: 0.9, scale: 1.02 } : {}}
+                      whileTap={nfcAvailable ? { scale: 0.98 } : {}}
                       aria-label={sharingTicketId === ticket.id ? "Stop sharing ticket" : "Validate ticket via NFC"}
                     >
                       {sharingTicketId === ticket.id ? (
                         <>
-                          <FiRadio size={16} />
+                          <FiRadio size={12} />
                           <span>Stop</span>
                         </>
                       ) : (
-                        <span>Validate</span>
+                        <>
+                          <FiRadio size={12} />
+                          <span>Validate</span>
+                        </>
                       )}
                     </motion.button>
                     <motion.button
@@ -335,18 +516,22 @@ const Wallet = memo(() => {
                           duration: 2000,
                         });
                       }}
-                      className="p-2 min-w-[44px] min-h-[44px] flex items-center justify-center"
-                      style={{ color: THEME.accent }}
-                      whileHover={{ opacity: 0.7, scale: 1.1 }}
-                      whileTap={{ scale: 0.9 }}
+                      className="p-2.5 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-lg"
+                      style={{ 
+                        color: THEME.accent,
+                        backgroundColor: `${THEME.accent}10`
+                      }}
+                      whileHover={{ opacity: 0.7, scale: 1.05 }}
+                      whileTap={{ scale: 0.95 }}
                       aria-label="Remove ticket"
                     >
-                      <FiTrash2 size={20} />
+                      <FiTrash2 size={18} />
                     </motion.button>
                   </div>
                 </div>
                 </AnimatedCard>
-              ))}
+              );
+              })}
             </div>
           )}
         </AnimatePresence>

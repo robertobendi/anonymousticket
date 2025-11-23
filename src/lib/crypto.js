@@ -794,3 +794,83 @@ export async function recordAuditLog(ticketId, location = 'Train IC-1 (Scanner A
     }
   })();
 }
+
+/**
+ * Activate ticket on blockchain
+ * Changes ticket status from ISSUED to ACTIVE
+ * @param {string} ticketId - Ticket ID (public key hex)
+ * @param {Uint8Array} privateKey - User's private key (Uint8Array from tweetnacl)
+ * @param {string} location - Optional location (e.g., "Zurich HB")
+ * @returns {Promise<{success: boolean, error?: string, blockIndex?: number}>}
+ */
+export async function activateTicket(ticketId, privateKey, location = 'Unknown Station') {
+  try {
+    console.log('🚀 Activating ticket...');
+    console.log('  Ticket ID:', ticketId.substring(0, 16) + '...');
+    console.log('  Location:', location);
+    
+    // 1. Prepare payload
+    const payload = {
+      timestamp: Date.now(),
+      location: location,
+      deviceId: 'USER_PHONE_APP'
+    };
+    
+    // 2. Sign payload with user's private key
+    console.log('✍️ Signing activation payload...');
+    const signature = signPayload(privateKey, payload);
+    console.log('✅ Payload signed. Signature length:', signature.length, 'hex chars');
+    
+    // 3. Send to blockchain
+    const transaction = {
+      type: 'ACTIVATE', // CRITICAL - must be ACTIVATE
+      ticketId: ticketId,
+      payload: payload,
+      signature: signature,
+    };
+    
+    console.log('📤 Submitting ACTIVATE transaction:', {
+      type: transaction.type,
+      ticketId: ticketId.substring(0, 16) + '...',
+      payload,
+    });
+    
+    const submitUrl = `${API_BASE_URL}/submit`;
+    const response = await fetch(submitUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+      },
+      body: JSON.stringify(transaction),
+    });
+    
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`HTTP error! status: ${response.status}, ${errorText}`);
+    }
+    
+    const json = await response.json();
+    
+    if (json.success) {
+      console.log('✅ Ticket Activated! Block #', json.data?.blockIndex || 'N/A');
+      return { 
+        success: true, 
+        blockIndex: json.data?.blockIndex 
+      };
+    } else {
+      console.error('❌ Activation Failed:', json.error);
+      return { 
+        success: false, 
+        error: json.error || 'Activation failed' 
+      };
+    }
+  } catch (error) {
+    const errorMessage = error?.message || error?.toString() || 'System Error';
+    console.error('❌ Network/Crypto Error:', errorMessage);
+    return { 
+      success: false, 
+      error: errorMessage 
+    };
+  }
+}
