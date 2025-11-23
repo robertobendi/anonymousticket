@@ -515,3 +515,282 @@ export async function submitMintTransaction({ ticketId, payload, signature }) {
     throw new Error(errorMessage);
   }
 }
+
+/**
+ * Submit INSPECT transaction to blockchain API
+ * Used by inspectors to validate tickets on the blockchain
+ * @param {Object} params - Transaction parameters
+ * @param {string} params.ticketId - Public key hex (ticket ID, 64 hex chars) - identifies the ticket being inspected
+ * @param {string} params.location - Location where inspection occurs (e.g., "Train IC1")
+ * @param {number} params.timestamp - Timestamp of inspection
+ * @param {string} params.deviceId - Device ID of scanner (e.g., "POLICE_SCANNER")
+ * @param {Uint8Array} params.scannerPrivateKey - Private key of scanner device to sign the transaction
+ * @returns {Promise<Object>} API response
+ */
+export async function submitInspectTransaction({ ticketId, location, timestamp, deviceId, scannerPrivateKey }) {
+  try {
+    // Create payload for INSPECT transaction
+    const payload = {
+      location: location,
+      timestamp: timestamp,
+      deviceId: deviceId,
+    };
+
+    // Sign payload with scanner's private key
+    console.log('✍️ Signing INSPECT payload with scanner key...');
+    const signature = signPayload(scannerPrivateKey, payload);
+    console.log('✅ INSPECT payload signed. Signature length:', signature.length, 'hex chars');
+
+    const transaction = {
+      type: 'INSPECT',
+      ticketId: ticketId, // Public key of the ticket being inspected
+      payload: payload,
+      signature: signature,
+    };
+    
+    console.log('📤 Submitting INSPECT transaction:', {
+      type: transaction.type,
+      ticketId: ticketId.substring(0, 16) + '...',
+      ticketIdLength: ticketId.length,
+      payload,
+      signatureLength: signature.length,
+    });
+    
+    const transactionJson = JSON.stringify(transaction);
+    console.log('📤 Full INSPECT transaction JSON:', transactionJson);
+    
+    // Use same API endpoint as MINT
+    const submitUrl = `${API_BASE_URL}/submit`;
+    console.log('📤 Submitting INSPECT to URL:', submitUrl);
+    
+    // Use XMLHttpRequest - same pattern as MINT
+    const response = await new Promise((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      
+      try {
+        xhr.open('POST', submitUrl, true);
+        xhr.setRequestHeader('Content-Type', 'application/json');
+        xhr.setRequestHeader('Accept', 'application/json');
+      } catch (openError) {
+        const errorMsg = `Failed to open request: ${openError?.message || String(openError)}`;
+        console.error('❌ XHR open error:', errorMsg);
+        reject(new Error(errorMsg));
+        return;
+      }
+      
+      xhr.onload = function() {
+        const responseText = xhr.responseText || '';
+        const status = xhr.status || 0;
+        console.log(`📥 INSPECT response status: ${status}`);
+        console.log(`📥 INSPECT response text (first 500 chars):`, responseText.substring(0, 500));
+        
+        if (status >= 200 && status < 300) {
+          if (responseText.trim().startsWith('<!DOCTYPE') || responseText.trim().startsWith('<html')) {
+            console.error('❌ Received HTML instead of JSON. Response:', responseText.substring(0, 200));
+            reject(new Error('Server returned HTML instead of JSON. Proxy may not be working.'));
+            return;
+          }
+          
+          try {
+            const json = JSON.parse(responseText);
+            resolve({
+              ok: true,
+              status: status,
+              json: async () => json,
+              text: async () => responseText,
+            });
+          } catch (e) {
+            console.error('❌ Failed to parse JSON. Response:', responseText.substring(0, 200));
+            reject(new Error('Failed to parse JSON response: ' + (e?.message || String(e))));
+          }
+        } else {
+          let errorMessage = `HTTP error! status: ${status}`;
+          try {
+            if (responseText) {
+              const errorJson = JSON.parse(responseText);
+              errorMessage += `, message: ${JSON.stringify(errorJson)}`;
+            } else {
+              errorMessage += `, empty response body`;
+            }
+          } catch (e) {
+            errorMessage += `, response: ${responseText.substring(0, 200)}`;
+          }
+          console.error('❌ INSPECT submit failed:', errorMessage);
+          reject(new Error(errorMessage));
+        }
+      };
+      
+      xhr.onerror = function(event) {
+        const errorMsg = `Network error: Failed to connect to ${submitUrl}. Status: ${xhr.status || 'unknown'}, ReadyState: ${xhr.readyState}`;
+        console.error('❌ XHR onerror:', errorMsg);
+        reject(new Error(errorMsg));
+      };
+      
+      xhr.ontimeout = function() {
+        const errorMsg = `Request timeout: Server did not respond within 30 seconds.`;
+        console.error('❌ XHR timeout:', errorMsg);
+        reject(new Error(errorMsg));
+      };
+      
+      xhr.timeout = 30000; // 30 seconds
+      
+      try {
+        xhr.send(JSON.stringify(transaction));
+      } catch (sendError) {
+        const errorMsg = `Failed to send request: ${sendError?.message || String(sendError)}`;
+        console.error('❌ XHR send error:', errorMsg);
+        reject(new Error(errorMsg));
+      }
+    });
+    
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`INSPECT submit failed: ${errorText}`);
+    }
+    
+    const data = await response.json();
+    console.log('✅ INSPECT transaction submitted successfully:', data);
+    return data;
+  } catch (error) {
+    const errorMessage = error?.message || error?.toString() || String(error) || 'Unknown error occurred';
+    console.error('❌ Error submitting INSPECT transaction:', {
+      message: errorMessage,
+      error: error,
+      stack: error?.stack
+    });
+    throw new Error(errorMessage);
+  }
+}
+
+/**
+ * Get or generate scanner key pair for inspector device
+ * Scanner key is used to sign INSPECT transactions
+ * @returns {Promise<{publicKeyHex: string, privateKey: Uint8Array}>}
+ */
+export async function getOrCreateScannerKeyPair() {
+  try {
+    const SCANNER_KEY_STORAGE_KEY = 'scanner_key_pair';
+    
+    // Check if scanner key already exists
+    const stored = localStorage.getItem(SCANNER_KEY_STORAGE_KEY);
+    if (stored) {
+      try {
+        const keyData = JSON.parse(stored);
+        const privateKey = importPrivateKeyFromBase64(keyData.privateKeyBase64);
+        const publicKeyHex = keyData.publicKeyHex;
+        console.log('✅ Using existing scanner key pair:', publicKeyHex.substring(0, 16) + '...');
+        return { publicKeyHex, privateKey };
+      } catch (e) {
+        console.warn('⚠️ Failed to load stored scanner key, generating new one:', e);
+      }
+    }
+    
+    // Generate new scanner key pair
+    console.log('🔑 Generating new scanner key pair...');
+    const keyPair = await generateKeyPair();
+    const publicKeyHex = exportPublicKeyToHex(keyPair.publicKey);
+    const privateKeyBase64 = exportPrivateKeyToBase64(keyPair.privateKey);
+    
+    // Store scanner key pair
+    localStorage.setItem(SCANNER_KEY_STORAGE_KEY, JSON.stringify({
+      publicKeyHex,
+      privateKeyBase64,
+    }));
+    
+    console.log('✅ Scanner key pair generated and stored:', publicKeyHex.substring(0, 16) + '...');
+    return { publicKeyHex, privateKey: keyPair.privateKey };
+  } catch (error) {
+    console.error('❌ Error getting/creating scanner key pair:', error);
+    throw new Error('Failed to get scanner key pair: ' + error.message);
+  }
+}
+
+/**
+ * Check ticket status on blockchain (FAST CHECK - Phase 1)
+ * Endpoint: GET https://threeheads.it/status/:ticketId
+ * @param {string} ticketId - Ticket ID (public key hex)
+ * @returns {Promise<{success: boolean, status: string, data?: any}>}
+ */
+export async function checkTicketStatus(ticketId) {
+  try {
+    const statusUrl = `${API_BASE_URL}/status/${ticketId}`;
+    console.log('🔍 Checking ticket status:', statusUrl);
+    
+    const response = await fetch(statusUrl, {
+      method: 'GET',
+      headers: {
+        'Accept': 'application/json',
+      },
+    });
+    
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    
+    const json = await response.json();
+    console.log('📥 Status response:', json);
+    
+    return json;
+  } catch (error) {
+    console.error('❌ Error checking ticket status:', error);
+    return {
+      success: false,
+      status: 'ERROR',
+      error: error.message || 'Failed to check ticket status'
+    };
+  }
+}
+
+/**
+ * Record audit log on blockchain (FIRE & FORGET - Phase 2)
+ * Endpoint: POST https://threeheads.it/submit
+ * This runs in background and does NOT block the UI
+ * @param {string} ticketId - Ticket ID (public key hex) of the ticket being inspected
+ * @param {string} location - Location where inspection occurs
+ * @returns {Promise<void>}
+ */
+export async function recordAuditLog(ticketId, location = 'Train IC-1 (Scanner App)') {
+  // Fire and forget - don't await, don't block UI
+  (async () => {
+    try {
+      console.log('📸 Logging inspection to blockchain...');
+      
+      // 1. Get or create scanner key pair (police badge)
+      const { privateKey: scannerPrivateKey } = await getOrCreateScannerKeyPair();
+      
+      // 2. Prepare payload
+      const payload = {
+        type: 'INSPECT',
+        location: location,
+        timestamp: Date.now(),
+        deviceId: 'POLICE_MOBILE_UNIT'
+      };
+      
+      // 3. Sign payload
+      const signature = signPayload(scannerPrivateKey, payload);
+      console.log('✅ Payload signed');
+      
+      // 4. Send to blockchain (fire & forget)
+      const submitUrl = `${API_BASE_URL}/submit`;
+      fetch(submitUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
+        body: JSON.stringify({
+          type: 'INSPECT',
+          ticketId: ticketId, // Passenger's ticket ID
+          payload: payload,
+          signature: signature,
+        }),
+      }).then(() => {
+        console.log('📸 Inspection mined on-chain.');
+      }).catch((e) => {
+        console.warn('⚠️ Audit log failed (UI unaffected):', e);
+      });
+    } catch (e) {
+      console.warn('⚠️ Audit log failed (UI unaffected):', e);
+    }
+  })();
+}

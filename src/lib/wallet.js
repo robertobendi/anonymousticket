@@ -110,18 +110,24 @@ export function getTicketForNFC(ticket) {
   }
 
   try {
-    // TEMPORARY TEST: Send simple test message to verify NFC communication works
-    return JSON.stringify({
-      test: "test andato"
+    // Return the ticket as JSON - include ticket ID (public key)
+    // Make sure ticket ID is included
+    const ticketData = {
+      ticket: true,
+      ...ticket,
+      id: ticket.id || ticket.ticketId, // Ensure ID is present
+      ticketId: ticket.ticketId || ticket.id, // Ensure ticketId is present
+      sharedAt: new Date().toISOString()
+    };
+    
+    console.log('Preparing ticket for NFC:', {
+      id: ticketData.id,
+      ticketId: ticketData.ticketId,
+      origin: ticketData.origin,
+      destination: ticketData.destination
     });
     
-    // Original code (commented for testing):
-    // Just return the ticket as JSON - simple and direct
-    // return JSON.stringify({
-    //   ticket: true,
-    //   ...ticket,
-    //   sharedAt: new Date().toISOString()
-    // });
+    return JSON.stringify(ticketData);
   } catch (error) {
     console.error('Error preparing ticket for NFC:', error);
     return null;

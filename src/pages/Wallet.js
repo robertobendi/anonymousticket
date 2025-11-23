@@ -2,30 +2,123 @@ import { useState, useEffect, memo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import toast from 'react-hot-toast';
-import { FiArrowLeft, FiTrash2, FiCreditCard, FiGlobe, FiAlertCircle, FiMenu, FiX } from 'react-icons/fi';
-import { useWallet } from '@lib/wallet';
-import { generateQRCodeData } from '@lib/ticketGenerator';
+import { FiArrowLeft, FiTrash2, FiCreditCard, FiGlobe, FiAlertCircle, FiMenu, FiRadio } from 'react-icons/fi';
+import { useWallet, getTicketForNFC } from '@lib/wallet';
+import { startBeacon, stopBeacon } from '@lib/nfc-simple';
+import { checkNFC } from '@lib/nfc-simple';
 import { THEME } from '@lib/themeColors';
 import AnimatedCard from '@components/ui/AnimatedCard';
 import AnimatedButton from '@components/ui/AnimatedButton';
 import MobileSidebar from '@components/ui/MobileSidebar';
-import QRCode from 'react-qr-code';
 
 /**
- * Wallet page - View tickets and share individual tickets via QR Code
+ * Wallet page - View tickets and share individual tickets via NFC
  */
 const Wallet = memo(() => {
   const navigate = useNavigate();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [tickets, addTicket, removeTicket, clearAll] = useWallet();
-  const [selectedTicket, setSelectedTicket] = useState(null); // Track which ticket is being displayed
+  const [nfcAvailable, setNfcAvailable] = useState(false);
+  const [sharingTicketId, setSharingTicketId] = useState(null); // Track which ticket is being shared
+  const [shareError, setShareError] = useState(null);
 
-  const handleShowQR = (ticket) => {
-    setSelectedTicket(ticket);
-  };
+  useEffect(() => {
+    // Check NFC availability
+    const checkNFCStatus = async () => {
+      try {
+        await new Promise(resolve => setTimeout(resolve, 500));
+        const status = await checkNFC();
+        setNfcAvailable(status.available && status.enabled);
+        console.log('NFC availability check:', status);
+      } catch (error) {
+        console.error('NFC check failed:', error);
+        setNfcAvailable(false);
+      }
+    };
+    checkNFCStatus();
+  }, []);
 
-  const closeQR = () => {
-    setSelectedTicket(null);
+  /**
+   * Handle sharing a single ticket via NFC using Host Card Emulation (HCE)
+   * Creates a ticket JSON and shares it via HCE
+   * Controller can scan this phone to receive the ticket and verify it
+   * @param {Object} ticket - Ticket to share
+   */
+  const handleShareTicket = async (ticket) => {
+    // If already sharing this ticket, stop sharing
+    if (sharingTicketId === ticket.id) {
+      try {
+        await stopBeacon();
+        setSharingTicketId(null);
+        setShareError(null);
+        console.log('Stopped sharing ticket:', ticket.id);
+        toast.success('Sharing stopped', {
+          icon: '🛑',
+          duration: 2000,
+        });
+      } catch (error) {
+        console.error('Error stopping beacon:', error);
+        setShareError('Failed to stop sharing');
+        toast.error('Failed to stop sharing', {
+          duration: 3000,
+        });
+      }
+      return;
+    }
+
+    // Stop any other active sharing first
+    if (sharingTicketId) {
+      try {
+        await stopBeacon();
+      } catch (error) {
+        console.warn('Error stopping previous beacon:', error);
+      }
+    }
+
+    setShareError(null);
+
+    try {
+      const status = await checkNFC();
+      if (!status.available || !status.enabled) {
+        setShareError('NFC is not available or disabled.');
+        toast.error('NFC is not available or disabled', {
+          duration: 4000,
+        });
+        return;
+      }
+      
+      // Get ticket JSON for sharing
+      const ticketJson = getTicketForNFC(ticket);
+      if (!ticketJson) {
+        setShareError('Failed to prepare ticket for sharing.');
+        toast.error('Failed to prepare ticket', {
+          duration: 4000,
+        });
+        return;
+      }
+      
+      console.log('Starting beacon mode for single ticket:', ticket.id);
+      console.log('Ticket JSON length:', ticketJson.length, 'chars');
+      
+      // Send the ticket JSON directly
+      await startBeacon(ticketJson);
+      setSharingTicketId(ticket.id);
+      console.log('✓ Beacon mode active - controller can scan this phone for ticket:', ticket.id);
+      toast.success('HCE card emulation active! Ready to be scanned.', {
+        icon: '📱',
+        duration: 4000,
+      });
+      // Note: Success here means "ready to share", not "shared successfully"
+      // The actual P2P exchange happens when phones touch
+    } catch (error) {
+      console.error('Beacon error:', error);
+      const errorMsg = error.message || 'Failed to start sharing';
+      setShareError(errorMsg);
+      setSharingTicketId(null);
+      toast.error(errorMsg, {
+        duration: 5000,
+      });
+    }
   };
 
   const formatDate = (dateString) => {
@@ -82,50 +175,26 @@ const Wallet = memo(() => {
           <div className="hidden md:block" style={{ width: '60px' }}></div> {/* Spacer for centering on desktop */}
         </motion.div>
 
-        {/* QR Code Modal */}
-        <AnimatePresence>
-          {selectedTicket && (
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80"
-              onClick={closeQR}
-            >
-              <motion.div
-                initial={{ scale: 0.9, opacity: 0 }}
-                animate={{ scale: 1, opacity: 1 }}
-                exit={{ scale: 0.9, opacity: 0 }}
-                className="bg-white p-6 rounded-xl max-w-sm w-full relative"
-                onClick={(e) => e.stopPropagation()}
-              >
-                <button
-                  onClick={closeQR}
-                  className="absolute top-4 right-4 text-gray-500 hover:text-gray-700"
-                >
-                  <FiX size={24} />
-                </button>
-                <div className="text-center mb-4">
-                  <h3 className="text-lg font-bold text-black mb-1">Ticket QR Code</h3>
-                  <p className="text-sm text-gray-500">Show this to the inspector</p>
-                </div>
-                <div className="flex justify-center p-4 bg-white rounded-lg">
-                  <QRCode 
-                    value={generateQRCodeData(selectedTicket)} 
-                    size={256}
-                    style={{ height: "auto", maxWidth: "100%", width: "100%" }}
-                    viewBox={`0 0 256 256`}
-                  />
-                </div>
-                <div className="mt-4 text-center">
-                  <p className="text-xs font-mono text-gray-500 break-all">
-                    {selectedTicket.id}
-                  </p>
-                </div>
-              </motion.div>
-            </motion.div>
-          )}
-        </AnimatePresence>
+        {/* Info Section */}
+        {!nfcAvailable && (
+          <AnimatedCard className="p-4 mb-6 rounded-lg" style={{ backgroundColor: THEME.card, border: `2px solid ${THEME.border}`, borderRadius: '8px' }}>
+            <div className="flex items-start gap-2">
+              <FiAlertCircle style={{ color: THEME.accent, marginTop: '2px' }} size={18} />
+              <p className="text-xs" style={{ color: THEME.textMuted }}>
+                NFC is not available. Please enable NFC on your device to share tickets.
+              </p>
+            </div>
+          </AnimatedCard>
+        )}
+
+        {shareError && (
+          <AnimatedCard className="p-4 mb-6 rounded-lg" style={{ backgroundColor: THEME.card, border: `2px solid ${THEME.accent}`, borderRadius: '8px' }}>
+            <div className="flex items-start gap-2">
+              <FiAlertCircle style={{ color: THEME.accent, marginTop: '2px' }} size={18} />
+              <p className="text-xs" style={{ color: THEME.accent }}>{shareError}</p>
+            </div>
+          </AnimatedCard>
+        )}
 
         {/* Tickets List */}
         <AnimatePresence mode="wait">
@@ -221,27 +290,42 @@ const Wallet = memo(() => {
                         </div>
                       </>
                     )}
-                    <div className="mt-2 p-2" style={{ backgroundColor: THEME.background }}>
-                      <div className="text-xs" style={{ color: THEME.textMuted }}>Control Code</div>
-                      <div className="text-sm font-mono font-bold" style={{ color: THEME.accent }}>
-                        {ticket.controlCode || '--------'}
+                    {sharingTicketId === ticket.id && (
+                      <div className="mt-2 p-2" style={{ backgroundColor: `${THEME.success}15`, borderLeft: `3px solid ${THEME.success}` }}>
+                        <div className="flex items-center gap-2">
+                          <FiRadio style={{ color: THEME.success }} size={14} />
+                          <p className="text-xs font-bold" style={{ color: THEME.success }}>
+                            Sharing via NFC...
+                          </p>
+                        </div>
+                        <p className="text-xs mt-1" style={{ color: THEME.textMuted }}>
+                          Controller: Go to Verify page and scan NFC tag/beacon
+                        </p>
                       </div>
-                    </div>
+                    )}
                   </div>
                   <div className="flex flex-col gap-2">
                     <motion.button
-                      onClick={() => handleShowQR(ticket)}
+                      onClick={() => handleShareTicket(ticket)}
+                      disabled={!nfcAvailable}
                       className="px-3 py-2 min-h-[44px] flex items-center justify-center gap-2 text-xs font-bold rounded"
                       style={{ 
-                        backgroundColor: THEME.accent,
-                        color: '#ffffff'
+                        backgroundColor: sharingTicketId === ticket.id ? THEME.success : THEME.accent,
+                        color: '#ffffff',
+                        opacity: !nfcAvailable ? 0.5 : 1
                       }}
-                      whileHover={{ opacity: 0.8, scale: 1.05 }}
-                      whileTap={{ scale: 0.95 }}
-                      aria-label="Validate Ticket"
+                      whileHover={nfcAvailable ? { opacity: 0.8, scale: 1.05 } : {}}
+                      whileTap={nfcAvailable ? { scale: 0.95 } : {}}
+                      aria-label={sharingTicketId === ticket.id ? "Stop sharing ticket" : "Validate ticket via NFC"}
                     >
-                      <FiCreditCard size={16} />
-                      <span>Validate</span>
+                      {sharingTicketId === ticket.id ? (
+                        <>
+                          <FiRadio size={16} />
+                          <span>Stop</span>
+                        </>
+                      ) : (
+                        <span>Validate</span>
+                      )}
                     </motion.button>
                     <motion.button
                       onClick={() => {
@@ -277,5 +361,3 @@ const Wallet = memo(() => {
 Wallet.displayName = 'Wallet';
 
 export default Wallet;
-
-

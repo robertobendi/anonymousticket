@@ -169,75 +169,120 @@ export function initializeGlobalNfcListener() {
 
 /**
  * Start reading NFC tags/cards
- * SIMPLE: Uses global listener that stays active
+ * Matches the working pattern from documentation, adapted for single tickets
  */
 export async function startReading() {
   if (!isAndroid || !window.NFC) {
     throw new Error('NFC not available on this platform');
   }
-
-  // Ensure global listener is initialized
-  if (!isListenerInitialized) {
-    initializeGlobalNfcListener();
-  }
-
-  // Enable scanning
+  // Enable scanning on native side - keep it active
   try {
     window.NFC.enableScan();
-    console.log('✅ NFC enableScan() called');
+    console.log('✓ NFC scanning enabled - listening for ticket data...');
+    console.log('Hold device near NFC tag or phone with ticket beacon active');
   } catch (error) {
-    console.error('Error enabling scan:', error);
-    // Continue anyway
+    console.error('Error enabling NFC scan:', error);
+    throw error;
   }
-
-  // Return promise that resolves when data arrives via global listener
+  // Return promise that resolves when NFC event is received
+  // Matches working pattern: check for ticket data (was "wallet" before)
   return new Promise((resolve, reject) => {
-    const resolverId = Date.now() + Math.random(); // Unique ID for this resolver
-    activeResolvers.push({ id: resolverId, resolve });
-    console.log(`📋 Added resolver #${resolverId}, total: ${activeResolvers.length}`);
-
-    // Timeout after 2 seconds - short for fast retries
-    setTimeout(() => {
-      const index = activeResolvers.findIndex(r => r.id === resolverId);
-      if (index > -1) {
-        activeResolvers.splice(index, 1);
-        console.log(`⏱️ Timeout for resolver #${resolverId}, remaining: ${activeResolvers.length}`);
-        reject(new Error('Timeout - no data received'));
+    let resolved = false;
+    let attempts = 0;
+    const maxAttempts = 10; // Allow more attempts for beacon mode
+    const handler = (event) => {
+      const tagId = event.detail?.id || '';
+      const tagData = event.detail?.data || '';
+      attempts++;
+      console.log(`NFC read attempt ${attempts}:`, { 
+        id: tagId, 
+        dataLength: tagData?.length || 0,
+        preview: tagData?.substring(0, 100) + '...' 
+      });
+      // Check if this is ticket data (adapted from wallet pattern)
+      // Look for ticket identifiers: "ticket", "ticketId", or "id"
+      if (tagData && (tagData.includes('"ticket"') || tagData.includes('"ticketId"') || tagData.includes('"id"'))) {
+        if (resolved) return;
+        resolved = true;
+        window.removeEventListener('nfctag', handler);
+        // Disable scanning
+        try {
+          if (window.NFC) {
+            window.NFC.disableScan();
+          }
+        } catch (e) {
+          // Ignore
+        }
+        console.log('✓✓✓ Ticket data received! ✓✓✓');
+        resolve({
+          id: tagId,
+          data: tagData
+        });
+      } else if (tagData && tagData.length > 0) {
+        // Got some data but not ticket - log it and keep listening
+        console.log(`Attempt ${attempts}: Got data but not ticket format, continuing...`);
+        
+        if (attempts >= maxAttempts) {
+          // After max attempts, reject if no ticket data
+          if (!resolved) {
+            resolved = true;
+            window.removeEventListener('nfctag', handler);
+            try {
+              if (window.NFC) {
+                window.NFC.disableScan();
+              }
+            } catch (e) {
+              // Ignore
+            }
+            reject(new Error(`No ticket data received after ${maxAttempts} attempts. Make sure: 1) Sending phone clicked "Validate" on a ticket, 2) Both phones unlocked, 3) Hold phones back-to-back.`));
+          }
+        }
+      } else {
+        // No data yet, keep listening
+        console.log(`Attempt ${attempts}: No data yet, continuing to listen...`);
       }
-    }, 2000);
+    };
+    window.addEventListener('nfctag', handler);
+    // Timeout after 90 seconds (longer for beacon mode)
+    setTimeout(() => {
+      if (resolved) return;
+      resolved = true;
+      window.removeEventListener('nfctag', handler);
+      // Disable scanning
+      try {
+        if (window.NFC) {
+          window.NFC.disableScan();
+        }
+      } catch (e) {
+        // Ignore
+      }
+      reject(new Error('NFC read timeout. Make sure: 1) Sending phone clicked "Validate" on a ticket, 2) Both phones unlocked, 3) Hold phones back-to-back.'));
+    }, 90000);
   });
 }
 
 /**
  * Start beacon mode (HCE) - Phone acts as NFC card
- * SIMPLE: Just set the data and activate HCE
  */
 export async function startBeacon(data) {
   if (!isAndroid || !window.NFC) {
     throw new Error('NFC not available on this platform');
   }
-
   if (!data || data.length === 0) {
     throw new Error('Data is required');
   }
-
-  console.log('🚀 Starting beacon with data:', data.substring(0, 100));
-
   try {
-    const result = window.NFC.startBeacon(data);
-    console.log('📤 startBeacon() result:', result);
-    
-    const parsed = JSON.parse(result);
-    
-    if (!parsed.success) {
-      throw new Error(parsed.error || 'Failed to start beacon');
+    const result = JSON.parse(window.NFC.startBeacon(data));
+    if (!result.success) {
+      throw new Error(result.error || 'Failed to start NFC beacon');
     }
-    
-    console.log('✅✅✅ HCE BEACON ACTIVE - Data set:', data.substring(0, 100));
-    return { success: true, message: parsed.message };
+    console.log('NFC beacon mode enabled:', result.message);
+    console.log('⚠️ Beacon is ACTIVE - waiting for controller to scan...');
+    console.log('⚠️ This does NOT mean data was sent - it means phone is ready to share');
+    return { success: true, message: result.message };
   } catch (error) {
-    console.error('❌ Error starting beacon:', error);
-    throw new Error('Failed to start beacon: ' + error.message);
+    console.error('Error starting NFC beacon:', error);
+    throw new Error('Failed to start NFC beacon: ' + error.message);
   }
 }
 

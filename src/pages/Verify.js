@@ -2,31 +2,32 @@ import { useState, useEffect, memo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import toast from 'react-hot-toast';
-import { FiCheckCircle, FiXCircle, FiAlertCircle, FiRefreshCw, FiArrowLeft, FiChevronDown, FiChevronUp, FiMenu, FiCamera } from 'react-icons/fi';
-import { verifyTicket, parseQRCodeData } from '@lib/ticketGenerator';
+import { FiCheckCircle, FiXCircle, FiAlertCircle, FiRefreshCw, FiArrowLeft, FiChevronDown, FiChevronUp, FiMenu, FiRadio } from 'react-icons/fi';
+import { checkNFC, startReading, requestNFCPermission } from '@lib/nfc-simple';
+import { parseNFCTicketData } from '@lib/nfc';
+import { checkTicketStatus, recordAuditLog } from '@lib/crypto';
 import { THEME } from '@lib/themeColors';
 import AnimatedCard from '@components/ui/AnimatedCard';
 import AnimatedButton from '@components/ui/AnimatedButton';
 import MobileSidebar from '@components/ui/MobileSidebar';
-import QrScanner from 'react-qr-scanner';
 
 /**
  * Ticket Verification Page
- * For inspectors to verify tickets via QR Code
+ * For inspectors to verify tickets via NFC
  */
 const Verify = memo(() => {
   const navigate = useNavigate();
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [isScanning, setIsScanning] = useState(false);
+  const [isReading, setIsReading] = useState(false);
   const [verificationResult, setVerificationResult] = useState(null);
   const [error, setError] = useState(null);
   const [showRawData, setShowRawData] = useState(false);
   const [isVerifying, setIsVerifying] = useState(false);
+  const [nfcAvailable, setNfcAvailable] = useState(false);
 
   // Helper function to set verification result with cooldown
   const setVerificationResultWithCooldown = async (result) => {
     setIsVerifying(true);
-    setIsScanning(false);
     
     // Wait for cooldown (1.5 seconds)
     await new Promise(resolve => setTimeout(resolve, 1500));
@@ -35,72 +36,187 @@ const Verify = memo(() => {
     setVerificationResult(result);
   };
 
-  const handleScan = async (data) => {
-    if (data) {
-      // data is object { text: string } or string
-      const qrText = data?.text || data;
-      console.log('QR Data:', qrText);
-      
-      setIsScanning(false);
-      
-      // Parse QR data
-      const parsedData = parseQRCodeData(qrText);
-      
-      if (!parsedData) {
-        setError('Invalid QR Code format');
-        toast.error('Invalid QR Code format');
+  useEffect(() => {
+    // Check NFC availability
+    const checkNFCStatus = async () => {
+      try {
+        await new Promise(resolve => setTimeout(resolve, 500));
+        const status = await checkNFC();
+        setNfcAvailable(status.available && status.enabled);
+      } catch (error) {
+        console.error('NFC check failed:', error);
+        setNfcAvailable(false);
+      }
+    };
+    checkNFCStatus();
+  }, []);
+
+  const handleReadNFC = async () => {
+    setIsReading(true);
+    setError(null);
+    setVerificationResult(null);
+    
+    try {
+      const status = await checkNFC();
+      if (!status.available || !status.enabled) {
+        setError('NFC is not available or disabled. Please enable NFC in settings.');
+        toast.error('NFC is not available or disabled', {
+          duration: 4000,
+        });
+        setIsReading(false);
         return;
       }
 
-      console.log('Verifying ticket:', parsedData.id);
-      const verification = verifyTicket(parsedData);
-      console.log('Verification result:', verification);
+      await requestNFCPermission();
       
-      if (verification.valid) {
-        toast.success('Ticket is valid!', {
-          icon: '✅',
-          duration: 3000,
-        });
-      } else {
-        toast.error(verification.message || 'Ticket is invalid', {
+      toast.loading('Scanning for NFC ticket...', {
+        id: 'nfc-scan',
+        duration: 90000,
+      });
+
+      const nfcData = await startReading();
+      
+      const tagId = nfcData.id || '';
+      const ticketDataString = nfcData.data || tagId;
+
+      // Parse ticket data
+      console.log('Parsing NFC data:', ticketDataString?.substring(0, 200));
+      let parsedData;
+      
+      try {
+        // Try to parse as JSON first
+        parsedData = JSON.parse(ticketDataString);
+      } catch (e) {
+        // If JSON parse fails, try the parseNFCTicketData function
+        parsedData = parseNFCTicketData(ticketDataString);
+      }
+      
+      console.log('Parsed data:', parsedData);
+      
+      toast.dismiss('nfc-scan');
+      
+      // Extract ticket ID
+      if (!parsedData || (!parsedData.id && !parsedData.ticketId)) {
+        toast.error('No ticket data found', {
           icon: '❌',
+          duration: 4000,
+        });
+        
+        await setVerificationResultWithCooldown({
+          valid: false,
+          message: 'No ticket data found in NFC scan.',
+          ticketId: null,
+          origin: null,
+          destination: null,
+          date: null,
+          rawTagId: tagId,
+          rawData: ticketDataString,
+        });
+        setShowRawData(true);
+        return;
+      }
+      
+      const ticketId = parsedData.id || parsedData.ticketId;
+      
+      // --- PHASE 1: FAST CHECK (The UI) ---
+      // Check ticket status immediately and show result
+      console.log('🔍 Phase 1: Fast check - checking ticket status...');
+      const statusResult = await checkTicketStatus(ticketId);
+      
+      let ticketStatus = 'ERROR';
+      let isValid = false;
+      let statusMessage = 'Error checking ticket status';
+      
+      if (statusResult.success && statusResult.data) {
+        const blockchainStatus = statusResult.data.status;
+        
+        if (blockchainStatus === 'ACTIVE') {
+          ticketStatus = 'VALID';
+          isValid = true;
+          statusMessage = 'Ticket is valid ✓';
+          
+          // Show green immediately
+          toast.success('Ticket is VALID', {
+            icon: '✅',
+            duration: 3000,
+          });
+          
+          // --- PHASE 2: BACKGROUND LOGGING (Fire & Forget) ---
+          // Only record audit if ticket is valid
+          const location = parsedData.train || 'Train IC-1 (Scanner App)';
+          recordAuditLog(ticketId, location);
+        } else if (blockchainStatus === 'EXPIRED') {
+          ticketStatus = 'EXPIRED';
+          isValid = false;
+          statusMessage = 'Ticket has expired';
+          
+          toast.error('Ticket EXPIRED', {
+            icon: '⏰',
+            duration: 4000,
+          });
+        } else {
+          ticketStatus = 'INVALID';
+          isValid = false;
+          statusMessage = 'Ticket is invalid or not activated';
+          
+          toast.error('Ticket INVALID', {
+            icon: '❌',
+            duration: 4000,
+          });
+        }
+      } else {
+        // API error - show error but still display ticket data
+        ticketStatus = 'ERROR';
+        isValid = false;
+        statusMessage = statusResult.error || 'Failed to check ticket status';
+        
+        toast.error('Error checking ticket status', {
+          icon: '⚠️',
           duration: 4000,
         });
       }
       
+      // Show result immediately (don't wait for audit log)
       await setVerificationResultWithCooldown({
-        valid: verification.valid,
-        message: verification.message,
-        ticketId: parsedData.id,
-        origin: parsedData.origin,
-        destination: parsedData.destination,
-        date: parsedData.date,
-        validUntil: parsedData.validUntil,
-        validFrom: parsedData.validFrom,
-        type: parsedData.type,
-        passType: parsedData.passType,
-        expired: verification.expired,
-        future: verification.future,
-        rawData: qrText,
+        valid: isValid,
+        message: statusMessage,
+        status: ticketStatus,
+        ticketId: ticketId,
+        origin: parsedData.origin || null,
+        destination: parsedData.destination || null,
+        date: parsedData.date || parsedData.timestamp || null,
+        validUntil: parsedData.validUntil || null,
+        validFrom: parsedData.validFrom || null,
+        type: parsedData.type || null,
+        passType: parsedData.passType || null,
+        train: parsedData.train || null,
+        price: parsedData.price || null,
+        rawTagId: tagId,
+        rawData: ticketDataString,
       });
+    } catch (error) {
+      console.error('NFC read error:', error);
+      toast.dismiss('nfc-scan');
+      const errorMsg = error.message || 'Failed to read NFC tag';
+      setError(errorMsg);
+      toast.error(errorMsg, {
+        duration: 5000,
+      });
+    } finally {
+      setIsReading(false);
     }
   };
 
-  const handleError = (err) => {
-    console.error('QR Scan Error:', err);
-    // Don't show error to user immediately as it might be temporary frame error
-  };
-
   const handleManualVerify = async () => {
-    const input = prompt('Enter ticket ID or control code:');
+    const input = prompt('Enter ticket ID:');
     if (!input) return;
 
     // Try to parse as ticket data (simulated) or just use ID
     const parsed = { id: input }; 
-    // In a real app, manual entry would likely just be the ID or control code
+    // In a real app, manual entry would likely just be the ticket ID
     // and we'd look it up in a backend. Here we just check if it looks valid-ish.
     
-    // Since we can't fully verify without the full data string that comes in QR,
+    // Since we can't fully verify without the full ticket data,
     // we'll do a basic check.
     const verification = verifyTicket(parsed);
     
@@ -156,54 +272,39 @@ const Verify = memo(() => {
             className="inline-flex items-center justify-center w-16 h-16 sm:w-20 sm:h-20 mb-3 sm:mb-4" 
             style={{ backgroundColor: THEME.accent, borderRadius: '8px' }}
           >
-            <FiCamera size={32} className="text-white sm:w-10 sm:h-10" style={{ width: '32px', height: '32px' }} />
+            <FiRadio size={32} className="text-white sm:w-10 sm:h-10" style={{ width: '32px', height: '32px' }} />
           </motion.div>
           <h1 className="text-2xl sm:text-3xl font-bold mb-2" style={{ color: THEME.text, lineHeight: '1.2' }}>
             Ticket Verification
           </h1>
           <p className="text-xs sm:text-sm px-2" style={{ color: THEME.textMuted, lineHeight: '1.4' }}>
-            Scan QR Code or enter ticket code manually
+            Scan NFC tag or enter ticket ID manually
           </p>
         </motion.div>
 
         {/* Verification Card */}
         <AnimatedCard className="p-4 sm:p-6 mb-4 sm:mb-6 rounded-lg" style={{ backgroundColor: THEME.card, border: `2px solid ${THEME.border}`, borderRadius: '8px' }}>
-          {/* QR Scan Button / View */}
-          {isScanning ? (
-            <div className="mb-4 overflow-hidden rounded-lg border-2 border-accent relative" style={{ borderColor: THEME.accent }}>
-               <QrScanner
-                  delay={300}
-                  onError={handleError}
-                  onScan={handleScan}
-                  style={{ width: '100%' }}
-                  constraints={{
-                    video: { facingMode: 'environment' }
-                  }}
-                />
-                <button 
-                  onClick={() => setIsScanning(false)}
-                  className="absolute top-2 right-2 bg-black/50 text-white p-2 rounded-full"
-                >
-                  <FiXCircle size={24} />
-                </button>
-                <p className="text-center text-white bg-black/50 absolute bottom-0 w-full py-2 text-sm">
-                  Point camera at QR Code
-                </p>
-            </div>
-          ) : (
+          {/* NFC Scan Button */}
+          {nfcAvailable ? (
             <AnimatedButton
-              onClick={() => {
-                setIsScanning(true);
-                setVerificationResult(null);
-                setError(null);
-              }}
+              onClick={handleReadNFC}
+              disabled={isReading}
               variant="primary"
               className="w-full py-4 sm:py-5 text-base sm:text-lg mb-3 sm:mb-4 rounded-lg"
-              icon={FiCamera}
-              aria-label="Scan QR Code"
+              icon={FiRadio}
+              aria-label="Scan NFC Tag / Beacon"
             >
-              Scan QR Code
+              {isReading ? 'Scanning NFC...' : 'Scan NFC Tag / Beacon'}
             </AnimatedButton>
+          ) : (
+            <div className="mb-4 p-3 rounded-lg" style={{ backgroundColor: `${THEME.accent}15`, border: `1px solid ${THEME.border}` }}>
+              <div className="flex items-start gap-2">
+                <FiAlertCircle style={{ color: THEME.accent, marginTop: '2px' }} size={18} />
+                <p className="text-xs" style={{ color: THEME.textMuted }}>
+                  NFC is not available. Please enable NFC on your device to scan tickets.
+                </p>
+              </div>
+            </div>
           )}
 
           {/* Manual Verification */}
@@ -211,9 +312,9 @@ const Verify = memo(() => {
             onClick={handleManualVerify}
             variant="secondary"
             className="w-full py-3 sm:py-4 text-xs sm:text-sm rounded-lg"
-            aria-label="Enter ticket code manually"
+            aria-label="Enter ticket ID manually"
           >
-            Enter Code Manually
+            Enter Ticket ID Manually
           </AnimatedButton>
         </AnimatedCard>
 
@@ -285,8 +386,12 @@ const Verify = memo(() => {
               exit={{ opacity: 0, scale: 0.95 }}
               className="p-4 sm:p-6 border-2 rounded-lg" 
               style={{ 
-                backgroundColor: verificationResult.valid ? `${THEME.success}15` : `${THEME.accent}15`,
-                borderColor: verificationResult.valid ? THEME.success : THEME.accent,
+                backgroundColor: verificationResult.status === 'VALID' ? `${THEME.success}15` : 
+                                 verificationResult.status === 'EXPIRED' ? '#ff980015' :
+                                 `${THEME.accent}15`,
+                borderColor: verificationResult.status === 'VALID' ? THEME.success : 
+                             verificationResult.status === 'EXPIRED' ? '#ff9800' :
+                             THEME.accent,
                 borderRadius: '8px'
               }}
               role="status"
@@ -294,14 +399,18 @@ const Verify = memo(() => {
               aria-atomic="true"
             >
             <div className="flex items-start gap-3 mb-4">
-              {verificationResult.valid ? (
+              {verificationResult.status === 'VALID' ? (
                 <FiCheckCircle size={28} className="sm:w-8 sm:h-8 flex-shrink-0" style={{ color: THEME.success, width: '28px', height: '28px', marginTop: '2px' }} />
+              ) : verificationResult.status === 'EXPIRED' ? (
+                <FiAlertCircle size={28} className="sm:w-8 sm:h-8 flex-shrink-0" style={{ color: '#ff9800', width: '28px', height: '28px', marginTop: '2px' }} />
               ) : (
                 <FiXCircle size={28} className="sm:w-8 sm:h-8 flex-shrink-0" style={{ color: THEME.accent, width: '28px', height: '28px', marginTop: '2px' }} />
               )}
               <div className="flex-1 min-w-0">
                 <h2 className="text-lg sm:text-xl font-bold mb-1" style={{ color: THEME.text, lineHeight: '1.2' }}>
-                  {verificationResult.valid ? 'Ticket Valid' : 'Ticket Invalid'}
+                  {verificationResult.status === 'VALID' ? 'Ticket Valid' : 
+                   verificationResult.status === 'EXPIRED' ? 'Ticket Expired' :
+                   verificationResult.status === 'INVALID' ? 'Ticket Invalid' : 'Error'}
                 </h2>
                 <p className="text-xs sm:text-sm leading-relaxed" style={{ color: THEME.textMuted }}>
                   {verificationResult.message}
@@ -309,7 +418,7 @@ const Verify = memo(() => {
               </div>
             </div>
 
-            {/* Raw QR Data - Always show if available, expandable */}
+            {/* Raw NFC Data - Always show if available, expandable */}
             {verificationResult.rawData && (
               <div className="mb-4">
                 <button
@@ -329,7 +438,7 @@ const Verify = memo(() => {
                   }}
                 >
                   <span className="text-xs sm:text-sm font-bold" style={{ color: THEME.text }}>
-                    📡 Raw QR Data {showRawData ? '(Click to hide)' : '(Click to read more)'}
+                    📡 Raw NFC Data {showRawData ? '(Click to hide)' : '(Click to read more)'}
                   </span>
                   {showRawData ? (
                     <FiChevronUp size={18} style={{ color: THEME.text }} />
@@ -356,11 +465,11 @@ const Verify = memo(() => {
             {/* Parsed Ticket Information */}
             {verificationResult.ticketId && (
               <div className="space-y-2.5 sm:space-y-3 text-xs sm:text-sm mb-4">
-                <div className="flex justify-between items-start gap-2">
-                  <span className="flex-shrink-0" style={{ color: THEME.textMuted }}>Ticket ID:</span>
-                  <span className="font-mono font-bold text-right break-all" style={{ color: THEME.text }}>
+                <div className="p-3 rounded border mb-3" style={{ backgroundColor: `${THEME.accent}10`, borderColor: THEME.accent }}>
+                  <div className="text-xs font-bold mb-1" style={{ color: THEME.textMuted }}>Ticket ID (Public Key):</div>
+                  <div className="font-mono font-bold break-all text-sm" style={{ color: THEME.accent }}>
                     {verificationResult.ticketId}
-                  </span>
+                  </div>
                 </div>
                 {verificationResult.origin && verificationResult.destination && (
                   <div className="flex justify-between items-start gap-2">
@@ -386,11 +495,10 @@ const Verify = memo(() => {
                 setVerificationResult(null);
                 setError(null);
                 setShowRawData(false);
-                setIsScanning(true);
               }}
               variant="secondary"
               className="mt-4 w-full py-3 sm:py-3.5 text-xs sm:text-sm rounded-lg"
-              icon={FiCamera}
+              icon={FiRadio}
               aria-label="Scan another ticket"
             >
               Scan Another Ticket

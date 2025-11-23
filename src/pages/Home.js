@@ -5,7 +5,7 @@ import toast from 'react-hot-toast';
 import { FiMapPin, FiCalendar, FiUsers, FiSearch, FiRepeat, FiAlertCircle, FiPrinter, FiShield, FiCreditCard, FiGlobe, FiRadio, FiMenu, FiArrowRight, FiClock, FiArrowLeft } from 'react-icons/fi';
 import { MdTrain, MdAccessTime, MdSwapHoriz } from 'react-icons/md';
 import { getConnections, transformConnection, getPopularStations, searchStations } from '@lib/api';
-import { generateAnonymousTicket, generateAnonymousPass, formatTicketForPrint, generateQRCodeData } from '@lib/ticketGenerator';
+import { generateAnonymousTicket, generateAnonymousPass, formatTicketForPrint } from '@lib/ticketGenerator';
 import { addTicketToWallet } from '@lib/wallet';
 import { generateAndStoreKeyPair, signPayload, submitMintTransaction } from '@lib/crypto';
 import { THEME } from '@lib/themeColors';
@@ -1260,18 +1260,7 @@ const Home = memo(() => {
                   </>
                 )}
 
-                <div className="p-3 text-center" style={{ backgroundColor: THEME.background }}>
-                  <div className="text-xs mb-1" style={{ color: THEME.textMuted }}>Control Code</div>
-                  <div className="text-lg font-bold font-mono" style={{ color: THEME.accent }}>
-                  </div>
-                </div>
 
-                <div className="mt-4 p-3 text-center border-2 border-dashed" style={{ borderColor: THEME.border }}>
-                  <div className="text-xs mb-2" style={{ color: THEME.textMuted }}>QR Code Data</div>
-                  <div className="text-xs font-mono break-all" style={{ color: THEME.text }}>
-                    {generateQRCodeData(purchasedTicket)}
-                  </div>
-                </div>
 
                 <div className="mt-4 text-xs text-center" style={{ color: THEME.textMuted }}>
                   <p>✓ No personal data required</p>
