@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, memo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Capacitor } from '@capacitor/core';
-import { FiBarChart2, FiTrendingUp, FiCheckCircle, FiRefreshCw, FiArrowLeft, FiCalendar, FiMapPin, FiX, FiMenu, FiLink, FiHash, FiClock, FiShield, FiDollarSign } from 'react-icons/fi';
+import { FiBarChart2, FiTrendingUp, FiCheckCircle, FiRefreshCw, FiArrowLeft, FiCalendar, FiMapPin, FiX, FiMenu, FiLink, FiHash, FiClock, FiShield, FiDollarSign, FiLogOut } from 'react-icons/fi';
 import { THEME } from '@lib/themeColors';
 import SwitzerlandMap from '@components/SwitzerlandMap';
 import AnimatedCard from '@components/ui/AnimatedCard';
@@ -274,20 +274,21 @@ const Dashboard = memo(() => {
     setSelectedCantons([]);
   };
 
-  const StatCard = ({ icon: Icon, label, value, color = THEME.accent, delay = 0 }) => (
+  const StatCard = ({ icon: Icon, label, value, color = THEME.accent, delay = 0, type }) => (
     <AnimatedCard
+      onClick={() => type && navigate(`/dashboard/history?type=${type}`)}
       delay={delay}
-      className="p-4 sm:p-6 border-2 rounded-lg"
+      className={`p-4 sm:p-6 border-2 rounded-lg ${type ? 'cursor-pointer' : ''}`}
       style={{ 
         backgroundColor: THEME.card, 
         borderColor: THEME.border,
         borderRadius: '8px'
       }}
-      whileHover={{ 
+      whileHover={type ? { 
         borderColor: color,
         backgroundColor: THEME.surfaceHover,
-        scale: 1.01 // Reduced scale - SBB Reduced principle
-      }}
+        scale: 1.02
+      } : {}}
     >
       <div className="flex items-center justify-between mb-4">
         <div 
@@ -310,6 +311,11 @@ const Dashboard = memo(() => {
       </div>
     </AnimatedCard>
   );
+
+  const handleLogout = () => {
+    sessionStorage.removeItem('dashboard_auth');
+    navigate('/login');
+  };
 
   return (
     <motion.div 
@@ -362,6 +368,18 @@ const Dashboard = memo(() => {
                 Refresh
               </AnimatedButton>
               <motion.button
+                onClick={handleLogout}
+                className="flex items-center gap-2 px-3 py-2 text-white font-bold text-xs uppercase min-h-[44px] rounded-lg"
+                style={{ backgroundColor: 'rgba(255,255,255,0.2)' }}
+                whileHover={{ backgroundColor: 'rgba(255,255,255,0.3)', scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                aria-label="Logout"
+                title="Logout"
+              >
+                <FiLogOut size={16} />
+                Logout
+              </motion.button>
+              <motion.button
                 onClick={() => setSidebarOpen(true)}
                 className="md:hidden p-2 min-w-[44px] min-h-[44px] flex items-center justify-center text-white"
                 whileHover={{ scale: 1.1, rotate: 90 }}
@@ -378,19 +396,38 @@ const Dashboard = memo(() => {
       {/* Dashboard Content */}
       <section className="max-w-6xl mx-auto px-4 sm:px-6 py-4 sm:py-6">
         {/* Date Info */}
-        <AnimatedCard className="mb-4 sm:mb-6 p-4 sm:p-6 flex items-center gap-3 rounded-lg" style={{ backgroundColor: THEME.card, border: `2px solid ${THEME.border}`, borderRadius: '8px' }}>
-          <FiCalendar size={20} style={{ color: THEME.accent }} />
-          <div>
-            <div className="text-sm font-bold" style={{ color: THEME.textMuted }}>Today</div>
-            <div className="text-lg font-bold" style={{ color: THEME.text }}>
-              {new Date().toLocaleDateString('en-US', { 
-                weekday: 'long', 
-                year: 'numeric', 
-                month: 'long', 
-                day: 'numeric' 
-              })}
+        <AnimatedCard className="mb-4 sm:mb-6 p-4 sm:p-6 flex items-center justify-between rounded-lg" style={{ backgroundColor: THEME.card, border: `2px solid ${THEME.border}`, borderRadius: '8px' }}>
+          <div className="flex items-center gap-3">
+            <FiCalendar size={20} style={{ color: THEME.accent }} />
+            <div>
+              <div className="text-sm font-bold" style={{ color: THEME.textMuted }}>Today</div>
+              <div className="text-lg font-bold" style={{ color: THEME.text }}>
+                {new Date().toLocaleDateString('en-US', { 
+                  weekday: 'long', 
+                  year: 'numeric', 
+                  month: 'long', 
+                  day: 'numeric' 
+                })}
+              </div>
             </div>
           </div>
+          <motion.button
+            onClick={() => fetchChainData()}
+            disabled={isLoading}
+            className="p-2 rounded-full flex items-center justify-center"
+            style={{ 
+              backgroundColor: `${THEME.accent}15`,
+              color: THEME.accent
+            }}
+            whileHover={{ 
+              backgroundColor: `${THEME.accent}25`,
+              rotate: 180 
+            }}
+            whileTap={{ scale: 0.9 }}
+            title="Refresh Data"
+          >
+            <FiRefreshCw size={20} className={isLoading ? "animate-spin" : ""} />
+          </motion.button>
         </AnimatedCard>
 
         {/* Statistics Cards */}
@@ -401,6 +438,7 @@ const Dashboard = memo(() => {
             value={stats.issuedToday}
             color={THEME.accent}
             delay={0.1}
+            type="issuedToday"
           />
           <StatCard
             icon={FiCheckCircle}
@@ -408,6 +446,7 @@ const Dashboard = memo(() => {
             value={stats.activated}
             color={THEME.success}
             delay={0.2}
+            type="activated"
           />
           <StatCard
             icon={FiShield}
@@ -415,6 +454,7 @@ const Dashboard = memo(() => {
             value={stats.verified}
             color={THEME.accent}
             delay={0.3}
+            type="verified"
           />
           <StatCard
             icon={FiDollarSign}
@@ -422,6 +462,7 @@ const Dashboard = memo(() => {
             value={`CHF ${stats.revenue.toFixed(2)}`}
             color={THEME.success}
             delay={0.4}
+            type="revenue"
           />
         </div>
 

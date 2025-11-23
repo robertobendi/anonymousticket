@@ -3,12 +3,16 @@ import { Routes, Route, useLocation } from "react-router-dom";
 import { THEME } from "@lib/themeColors";
 import Footer from "@layouts/Footer";
 
+import ProtectedRoute from "@components/ProtectedRoute";
+
 // Lazy load pages
 const Home = lazy(() => import("@pages/Home"));
 const Verify = lazy(() => import("@pages/Verify"));
 const Wallet = lazy(() => import("@pages/Wallet"));
 const ReceivedTickets = lazy(() => import("@pages/ReceivedTickets"));
 const Dashboard = lazy(() => import("@pages/Dashboard"));
+const StatsHistory = lazy(() => import("@pages/StatsHistory"));
+const Login = lazy(() => import("@pages/Login"));
 
 // Routes configuration
 const routes = [
@@ -16,7 +20,23 @@ const routes = [
   { path: "/verify", element: <Verify /> },
   { path: "/wallet", element: <Wallet /> },
   { path: "/received", element: <ReceivedTickets /> },
-  { path: "/dashboard", element: <Dashboard /> }
+  { path: "/login", element: <Login /> },
+  { 
+    path: "/dashboard", 
+    element: (
+      <ProtectedRoute>
+        <Dashboard />
+      </ProtectedRoute>
+    ) 
+  },
+  { 
+    path: "/dashboard/history", 
+    element: (
+      <ProtectedRoute>
+        <StatsHistory />
+      </ProtectedRoute>
+    ) 
+  }
 ];
 
 // Loading component
