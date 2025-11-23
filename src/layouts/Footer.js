@@ -61,6 +61,15 @@ const Footer = memo(() => {
               sbb.ch
             </a>
             <a
+              href="/about"
+              className="text-xs transition-colors font-medium"
+              style={linkStyle}
+              onMouseEnter={(e) => handleLinkHover(e, true)}
+              onMouseLeave={(e) => handleLinkHover(e, false)}
+            >
+              About
+            </a>
+            <a
               href="#"
               className="text-xs transition-colors font-medium"
               style={linkStyle}

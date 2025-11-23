@@ -10,7 +10,6 @@ A proof-of-concept for an anonymous, multi-checkable public transport ticketing 
 -   **NFC-Based Verification**: An inspector mode allows for contactless ticket verification by scanning a user's phone or a compatible NFC tag.
 -   **Peer-to-Peer Sharing (Beacon Mode)**: A user's phone can emulate an NFC card (Host Card Emulation) for a ticket inspector to scan, enabling a seamless and private verification process.
 -   **Android APK Build**: The web application is packaged into a native Android app using Capacitor, complete with custom Java code for advanced NFC capabilities.
--   **Print@Home Support**: Generates a printable HTML version of the ticket.
 
 ## Technology Stack
 

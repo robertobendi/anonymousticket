@@ -434,7 +434,7 @@ const Home = memo(() => {
                 role="text"
                 aria-label="Key features: No personal data required, Print at Home, Multiple checks, Copy-safe"
               >
-                No personal data required • Print@Home • Multiple checks • Copy-safe
+                No personal data required • Multiple checks • Copy-safe
               </motion.p>
               <motion.div 
                 className="flex items-center justify-center gap-3 sm:gap-4 flex-wrap"

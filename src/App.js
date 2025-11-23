@@ -14,6 +14,7 @@ const ReceivedTickets = lazy(() => import("@pages/ReceivedTickets"));
 const Dashboard = lazy(() => import("@pages/Dashboard"));
 const StatsHistory = lazy(() => import("@pages/StatsHistory"));
 const Login = lazy(() => import("@pages/Login"));
+const About = lazy(() => import("@pages/About"));
 
 // Routes configuration
 const routes = [
@@ -22,6 +23,7 @@ const routes = [
   { path: "/wallet", element: <Wallet /> },
   { path: "/received", element: <ReceivedTickets /> },
   { path: "/login", element: <Login /> },
+  { path: "/about", element: <About /> },
   { 
     path: "/dashboard", 
     element: (
