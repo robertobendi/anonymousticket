@@ -5,8 +5,8 @@ import { FiArrowLeft, FiBarChart2, FiTrendingUp, FiCheckCircle, FiShield, FiDoll
 import { THEME } from '@lib/themeColors';
 import AnimatedCard from '@components/ui/AnimatedCard';
 
-// Mock data for fallback (same as Dashboard)
-const MOCK_CHAIN_DATA = {
+// Removed mock data - only show real data
+// const MOCK_CHAIN_DATA = {
   "success": true,
   "data": {
     "blocks": [
@@ -73,8 +73,10 @@ const StatsHistory = () => {
         } catch (error) {
           console.error('Error fetching chain data:', error);
           if (attempt === retries) {
-            setChainData(MOCK_CHAIN_DATA.data);
+            // Don't use mock data - show error state
+            setChainData(null);
             setIsLoading(false);
+            console.error('❌ Failed to connect to API. No data available.');
           } else {
             await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
           }
