@@ -7,8 +7,8 @@
 import * as nacl from 'tweetnacl';
 
 const PRIVATE_KEY_STORAGE_KEY = 'ticket_private_keys';
-// ZERO SECURITY - Direct API call
-const API_BASE_URL = 'http://83.229.83.184:8000';
+// Use local proxy to avoid CORS issues - proxy forwards to blockchain server
+const API_BASE_URL = '/api';
 
 /**
  * Generate Ed25519 key pair
@@ -300,23 +300,33 @@ export async function submitMintTransaction({ ticketId, payload, signature }) {
     console.log('📤 Full transaction JSON:', transactionJson);
     console.log('📤 Payload being signed:', JSON.stringify(payload));
     
-    // ZERO SECURITY - Direct API call
+    // Use local proxy to avoid CORS - proxy forwards to blockchain server
     const submitUrl = `${API_BASE_URL}/submit`;
     console.log('📤 Submitting to URL:', submitUrl);
     
     // Use XMLHttpRequest - bypasses more browser restrictions
     const response = await new Promise((resolve, reject) => {
       const xhr = new XMLHttpRequest();
-      xhr.open('POST', submitUrl, true);
-      xhr.setRequestHeader('Content-Type', 'application/json');
-      xhr.setRequestHeader('Accept', 'application/json');
+      
+      try {
+        xhr.open('POST', submitUrl, true);
+        xhr.setRequestHeader('Content-Type', 'application/json');
+        xhr.setRequestHeader('Accept', 'application/json');
+      } catch (openError) {
+        const errorMsg = `Failed to open request: ${openError?.message || String(openError)}`;
+        console.error('❌ XHR open error:', errorMsg);
+        reject(new Error(errorMsg));
+        return;
+      }
       
       xhr.onload = function() {
-        const responseText = xhr.responseText;
-        console.log(`📥 Response status: ${xhr.status}`);
-        console.log(`📥 Response text:`, responseText.substring(0, 500));
+        const responseText = xhr.responseText || '';
+        const status = xhr.status || 0;
+        console.log(`📥 Response status: ${status}`);
+        console.log(`📥 Response text length: ${responseText.length}`);
+        console.log(`📥 Response text (first 500 chars):`, responseText.substring(0, 500));
         
-        if (xhr.status >= 200 && xhr.status < 300) {
+        if (status >= 200 && status < 300) {
           // Check if we got HTML instead of JSON (proxy not working)
           if (responseText.trim().startsWith('<!DOCTYPE') || responseText.trim().startsWith('<html')) {
             console.error('❌ Received HTML instead of JSON. Response:', responseText.substring(0, 200));
@@ -328,20 +338,24 @@ export async function submitMintTransaction({ ticketId, payload, signature }) {
             const json = JSON.parse(responseText);
             resolve({
               ok: true,
-              status: xhr.status,
+              status: status,
               json: async () => json,
               text: async () => responseText,
             });
           } catch (e) {
             console.error('❌ Failed to parse JSON. Response:', responseText.substring(0, 200));
-            reject(new Error('Failed to parse JSON response: ' + e.message));
+            reject(new Error('Failed to parse JSON response: ' + (e?.message || String(e))));
           }
         } else {
           // Even on error, try to parse JSON to get error message
-          let errorMessage = `HTTP error! status: ${xhr.status}`;
+          let errorMessage = `HTTP error! status: ${status}`;
           try {
-            const errorJson = JSON.parse(responseText);
-            errorMessage += `, message: ${JSON.stringify(errorJson)}`;
+            if (responseText) {
+              const errorJson = JSON.parse(responseText);
+              errorMessage += `, message: ${JSON.stringify(errorJson)}`;
+            } else {
+              errorMessage += `, empty response body`;
+            }
           } catch (e) {
             errorMessage += `, response: ${responseText.substring(0, 200)}`;
           }
@@ -350,16 +364,38 @@ export async function submitMintTransaction({ ticketId, payload, signature }) {
         }
       };
       
-      xhr.onerror = function() {
-        reject(new Error('Network error'));
+      xhr.onerror = function(event) {
+        const errorMsg = `Network error: Failed to connect to ${submitUrl}. This could be a CORS issue, network problem, or the server is unreachable. Status: ${xhr.status || 'unknown'}, ReadyState: ${xhr.readyState}`;
+        console.error('❌ XHR onerror:', errorMsg, {
+          status: xhr.status,
+          readyState: xhr.readyState,
+          responseText: xhr.responseText?.substring(0, 200),
+          event: event
+        });
+        reject(new Error(errorMsg));
       };
       
       xhr.ontimeout = function() {
-        reject(new Error('Request timeout'));
+        const errorMsg = `Request timeout: Server did not respond within 30 seconds.`;
+        console.error('❌ XHR timeout:', errorMsg);
+        reject(new Error(errorMsg));
+      };
+      
+      xhr.onabort = function() {
+        const errorMsg = `Request aborted: The request was cancelled.`;
+        console.error('❌ XHR aborted:', errorMsg);
+        reject(new Error(errorMsg));
       };
       
       xhr.timeout = 30000; // 30 seconds
-      xhr.send(JSON.stringify(transaction));
+      
+      try {
+        xhr.send(JSON.stringify(transaction));
+      } catch (sendError) {
+        const errorMsg = `Failed to send request: ${sendError?.message || String(sendError)}`;
+        console.error('❌ XHR send error:', errorMsg);
+        reject(new Error(errorMsg));
+      }
     });
     
     if (!response.ok) {
@@ -371,7 +407,14 @@ export async function submitMintTransaction({ ticketId, payload, signature }) {
     console.log('✅ MINT transaction submitted successfully:', data);
     return data;
   } catch (error) {
-    console.error('❌ Error submitting MINT transaction:', error);
-    throw error;
+    // Ensure error has a message
+    const errorMessage = error?.message || error?.toString() || String(error) || 'Unknown error occurred';
+    console.error('❌ Error submitting MINT transaction:', {
+      message: errorMessage,
+      error: error,
+      stack: error?.stack
+    });
+    // Throw a new error with a guaranteed message
+    throw new Error(errorMessage);
   }
 }

@@ -164,8 +164,13 @@ const Home = memo(() => {
       
       console.log('✅ Pass purchased and added to wallet!');
     } catch (error) {
-      console.error('❌ Error purchasing pass:', error);
-      alert('Error purchasing pass: ' + error.message);
+      const errorMessage = error?.message || error?.toString() || String(error) || 'Unknown error occurred';
+      console.error('❌ Error purchasing pass:', {
+        message: errorMessage,
+        error: error,
+        stack: error?.stack
+      });
+      alert('Error purchasing pass: ' + errorMessage);
     }
   };
 
@@ -261,8 +266,13 @@ const Home = memo(() => {
       
       console.log('✅ Ticket purchased and added to wallet!');
     } catch (error) {
-      console.error('❌ Error purchasing ticket:', error);
-      alert('Error purchasing ticket: ' + error.message);
+      const errorMessage = error?.message || error?.toString() || String(error) || 'Unknown error occurred';
+      console.error('❌ Error purchasing ticket:', {
+        message: errorMessage,
+        error: error,
+        stack: error?.stack
+      });
+      alert('Error purchasing ticket: ' + errorMessage);
     }
   };
 
@@ -639,8 +649,18 @@ const Home = memo(() => {
                     type="text"
                     value={formData.origin}
                     onChange={(e) => handleStationInput('origin', e.target.value)}
-                    onFocus={() => formData.origin.length >= 2 && setShowOriginSuggestions(true)}
-                    onBlur={() => setTimeout(() => setShowOriginSuggestions(false), 200)}
+                    onFocus={(e) => {
+                      if (formData.origin.length >= 2) setShowOriginSuggestions(true);
+                      e.target.style.borderColor = THEME.accent;
+                      e.target.style.borderWidth = '3px';
+                      e.target.style.backgroundColor = THEME.surfaceHover;
+                    }}
+                    onBlur={(e) => {
+                      setTimeout(() => setShowOriginSuggestions(false), 200);
+                      e.target.style.borderColor = THEME.border;
+                      e.target.style.borderWidth = '2px';
+                      e.target.style.backgroundColor = THEME.card;
+                    }}
                     placeholder="Enter station name"
                     className="w-full pl-12 pr-4 py-3.5 border-2 focus:outline-none font-normal text-base rounded-lg"
                     style={{ 
@@ -649,16 +669,6 @@ const Home = memo(() => {
                       color: THEME.text,
                       borderRadius: '8px',
                       paddingLeft: '48px'
-                    }}
-                    onFocus={(e) => {
-                      e.target.style.borderColor = THEME.accent;
-                      e.target.style.borderWidth = '3px';
-                      e.target.style.backgroundColor = THEME.surfaceHover;
-                    }}
-                    onBlur={(e) => {
-                      e.target.style.borderColor = THEME.border;
-                      e.target.style.borderWidth = '2px';
-                      e.target.style.backgroundColor = THEME.card;
                     }}
                     required
                     aria-label="Origin station"
@@ -735,8 +745,18 @@ const Home = memo(() => {
                     type="text"
                     value={formData.destination}
                     onChange={(e) => handleStationInput('destination', e.target.value)}
-                    onFocus={() => formData.destination.length >= 2 && setShowDestinationSuggestions(true)}
-                    onBlur={() => setTimeout(() => setShowDestinationSuggestions(false), 200)}
+                    onFocus={(e) => {
+                      if (formData.destination.length >= 2) setShowDestinationSuggestions(true);
+                      e.target.style.borderColor = THEME.accent;
+                      e.target.style.borderWidth = '3px';
+                      e.target.style.backgroundColor = THEME.surfaceHover;
+                    }}
+                    onBlur={(e) => {
+                      setTimeout(() => setShowDestinationSuggestions(false), 200);
+                      e.target.style.borderColor = THEME.border;
+                      e.target.style.borderWidth = '2px';
+                      e.target.style.backgroundColor = THEME.card;
+                    }}
                     placeholder="Enter station name"
                     className="w-full pl-12 pr-4 py-3.5 border-2 focus:outline-none font-normal text-base rounded-lg"
                     style={{ 
@@ -745,16 +765,6 @@ const Home = memo(() => {
                       color: THEME.text,
                       borderRadius: '8px',
                       paddingLeft: '48px'
-                    }}
-                    onFocus={(e) => {
-                      e.target.style.borderColor = THEME.accent;
-                      e.target.style.borderWidth = '3px';
-                      e.target.style.backgroundColor = THEME.surfaceHover;
-                    }}
-                    onBlur={(e) => {
-                      e.target.style.borderColor = THEME.border;
-                      e.target.style.borderWidth = '2px';
-                      e.target.style.backgroundColor = THEME.card;
                     }}
                     required
                     aria-label="Destination station"

@@ -222,7 +222,16 @@ app.get('/api/chain', async (req, res) => {
   }
 });
 
-// Proxy endpoint for submit - ZERO SECURITY
+// Handle OPTIONS preflight for submit endpoint
+app.options('/api/submit', (req, res) => {
+  res.header('Access-Control-Allow-Origin', '*');
+  res.header('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.header('Access-Control-Allow-Headers', '*');
+  res.header('Access-Control-Max-Age', '86400');
+  res.sendStatus(200);
+});
+
+// Proxy endpoint for submit - ZERO SECURITY, ALLOWS ALL CORS
 app.post('/api/submit', async (req, res) => {
   try {
     console.log('📥 Received submit request:', {
