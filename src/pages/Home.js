@@ -1,6 +1,7 @@
 import { useState, memo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
+import toast from 'react-hot-toast';
 import { FiMapPin, FiCalendar, FiUsers, FiSearch, FiRepeat, FiAlertCircle, FiPrinter, FiShield, FiCreditCard, FiGlobe, FiRadio, FiMenu, FiArrowRight, FiClock, FiArrowLeft } from 'react-icons/fi';
 import { MdTrain, MdAccessTime, MdSwapHoriz } from 'react-icons/md';
 import { getConnections, transformConnection, getPopularStations, searchStations } from '@lib/api';
@@ -163,6 +164,10 @@ const Home = memo(() => {
       setPurchasedTicket(pass);
       
       console.log('✅ Pass purchased and added to wallet!');
+      toast.success('Pass purchased successfully!', {
+        icon: '✅',
+        duration: 3000,
+      });
     } catch (error) {
       const errorMessage = error?.message || error?.toString() || String(error) || 'Unknown error occurred';
       console.error('❌ Error purchasing pass:', {
@@ -170,7 +175,9 @@ const Home = memo(() => {
         error: error,
         stack: error?.stack
       });
-      alert('Error purchasing pass: ' + errorMessage);
+      toast.error('Error purchasing pass: ' + errorMessage, {
+        duration: 5000,
+      });
     }
   };
 
@@ -265,6 +272,10 @@ const Home = memo(() => {
       setPurchasedTicket(ticket);
       
       console.log('✅ Ticket purchased and added to wallet!');
+      toast.success('Ticket purchased successfully!', {
+        icon: '✅',
+        duration: 3000,
+      });
     } catch (error) {
       const errorMessage = error?.message || error?.toString() || String(error) || 'Unknown error occurred';
       console.error('❌ Error purchasing ticket:', {
@@ -272,7 +283,9 @@ const Home = memo(() => {
         error: error,
         stack: error?.stack
       });
-      alert('Error purchasing ticket: ' + errorMessage);
+      toast.error('Error purchasing ticket: ' + errorMessage, {
+        duration: 5000,
+      });
     }
   };
 
@@ -1250,7 +1263,6 @@ const Home = memo(() => {
                 <div className="p-3 text-center" style={{ backgroundColor: THEME.background }}>
                   <div className="text-xs mb-1" style={{ color: THEME.textMuted }}>Control Code</div>
                   <div className="text-lg font-bold font-mono" style={{ color: THEME.accent }}>
-                    {purchasedTicket.controlCode}
                   </div>
                 </div>
 

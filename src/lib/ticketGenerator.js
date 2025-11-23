@@ -33,13 +33,9 @@ export function generateAnonymousTicket(ticketData) {
   // Simple hash function for ticket ID
   const ticketId = hashString(ticketString);
   
-  // Generate control code (for inspectors to verify)
-  const controlCode = generateControlCode(ticketId, ticketData);
-  
-  // Create ticket object (NO personal data)
+  // Create ticket object (NO personal data, NO control code)
   const ticket = {
     id: ticketId,
-    controlCode: controlCode,
     origin: ticketData.origin,
     destination: ticketData.destination,
     date: ticketData.date,
@@ -71,7 +67,6 @@ export function generateAnonymousPass(passData) {
   const passString = `${passData.type}-${passData.date}-${timestamp}-${random}`;
   
   const passId = hashString(passString);
-  const controlCode = hashString(`${passId}-${passData.type}-${passData.date}`).substring(0, 8).toUpperCase();
   
   // Calculate validity period
   const startDate = new Date(passData.date);
@@ -94,7 +89,6 @@ export function generateAnonymousPass(passData) {
   
   const pass = {
     id: passId,
-    controlCode: controlCode,
     type: 'pass',
     passType: passData.type,
     date: passData.date,
@@ -270,7 +264,7 @@ export function verifyTicket(ticket) {
   
   // If we only have ticket ID and control code, assume valid (would check against database in production)
   // This is for cases where we only get minimal data from NFC
-  if (ticket.controlCode) {
+  if (ticket.id) {
     return {
       valid: true,
       expired: false,
@@ -315,7 +309,6 @@ export function parseQRCodeData(qrData) {
     
     return {
       id: parts[0],
-      controlCode: parts[1],
       origin: parts[2],
       destination: parts[3],
       date: parts[4],

@@ -1,6 +1,7 @@
 import { useState, useEffect, memo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
+import toast from 'react-hot-toast';
 import { FiArrowLeft, FiRadio, FiTrash2, FiCreditCard, FiGlobe, FiAlertCircle, FiMenu, FiShare2 } from 'react-icons/fi';
 import { useWallet, getTicketForNFC } from '@lib/wallet';
 import { startBeacon, stopBeacon } from '@lib/nfc-simple';
@@ -51,9 +52,16 @@ const Wallet = memo(() => {
         setSharingTicketId(null);
         setShareError(null);
         console.log('Stopped sharing ticket:', ticket.id);
+        toast.success('Sharing stopped', {
+          icon: '🛑',
+          duration: 2000,
+        });
       } catch (error) {
         console.error('Error stopping beacon:', error);
         setShareError('Failed to stop sharing');
+        toast.error('Failed to stop sharing', {
+          duration: 3000,
+        });
       }
       return;
     }
@@ -73,29 +81,43 @@ const Wallet = memo(() => {
       const status = await checkNFC();
       if (!status.available || !status.enabled) {
         setShareError('NFC is not available or disabled.');
+        toast.error('NFC is not available or disabled', {
+          duration: 4000,
+        });
         return;
       }
       
-      // Get signature message (hex string: public key + signature)
-      const messageHex = await getTicketForNFC(ticket);
-      if (!messageHex) {
-        setShareError('Failed to prepare ticket signature for sharing.');
+      // Get ticket JSON for sharing
+      const ticketJson = getTicketForNFC(ticket);
+      if (!ticketJson) {
+        setShareError('Failed to prepare ticket for sharing.');
+        toast.error('Failed to prepare ticket', {
+          duration: 4000,
+        });
         return;
       }
       
       console.log('Starting beacon mode for single ticket:', ticket.id);
-      console.log('Signature message length:', messageHex.length, 'hex chars (expected 192)');
+      console.log('Ticket JSON length:', ticketJson.length, 'chars');
       
-      // Send the hex string directly (not JSON)
-      await startBeacon(messageHex);
+      // Send the ticket JSON directly
+      await startBeacon(ticketJson);
       setSharingTicketId(ticket.id);
       console.log('✓ Beacon mode active - controller can scan this phone for ticket:', ticket.id);
+      toast.success('HCE card emulation active! Ready to be scanned.', {
+        icon: '📱',
+        duration: 4000,
+      });
       // Note: Success here means "ready to share", not "shared successfully"
       // The actual P2P exchange happens when phones touch
     } catch (error) {
       console.error('Beacon error:', error);
-      setShareError(error.message || 'Failed to start sharing');
+      const errorMsg = error.message || 'Failed to start sharing';
+      setShareError(errorMsg);
       setSharingTicketId(null);
+      toast.error(errorMsg, {
+        duration: 5000,
+      });
     }
   };
 
@@ -271,7 +293,6 @@ const Wallet = memo(() => {
                     <div className="mt-2 p-2" style={{ backgroundColor: THEME.background }}>
                       <div className="text-xs" style={{ color: THEME.textMuted }}>Control Code</div>
                       <div className="text-sm font-mono font-bold" style={{ color: THEME.accent }}>
-                        {ticket.controlCode}
                       </div>
                     </div>
                     {sharingTicketId === ticket.id && (
@@ -312,7 +333,13 @@ const Wallet = memo(() => {
                       )}
                     </motion.button>
                     <motion.button
-                      onClick={() => removeTicket(ticket.id)}
+                      onClick={() => {
+                        removeTicket(ticket.id);
+                        toast.success('Ticket removed from wallet', {
+                          icon: '🗑️',
+                          duration: 2000,
+                        });
+                      }}
                       className="p-2 min-w-[44px] min-h-[44px] flex items-center justify-center"
                       style={{ color: THEME.accent }}
                       whileHover={{ opacity: 0.7, scale: 1.1 }}

@@ -100,27 +100,32 @@ export function getWalletForNFC() {
 
 /**
  * Get single ticket formatted for NFC transmission
- * Returns signature message (public key + signature) for validation
+ * Simply returns the ticket JSON - no signature verification needed
  * @param {Object} ticket - Ticket object to share
- * @returns {Promise<string>} Hex string of signature message (192 hex chars)
+ * @returns {string} JSON string of the ticket
  */
-export async function getTicketForNFC(ticket) {
+export function getTicketForNFC(ticket) {
   if (!ticket) {
     return null;
   }
-  
-  const ticketId = ticket.ticketId || ticket.id;
-  if (!ticketId) {
-    throw new Error('Ticket ID is required for NFC sharing');
-  }
 
-  // Import the function to create signature message
-  const { createTicketSignatureMessage } = await import('@lib/crypto');
-  
-  // Create signature message: Public Key (32 bytes) + Signature (64 bytes)
-  const messageHex = await createTicketSignatureMessage(ticketId);
-  
-  return messageHex;
+  try {
+    // TEMPORARY TEST: Send simple test message to verify NFC communication works
+    return JSON.stringify({
+      test: "test andato"
+    });
+    
+    // Original code (commented for testing):
+    // Just return the ticket as JSON - simple and direct
+    // return JSON.stringify({
+    //   ticket: true,
+    //   ...ticket,
+    //   sharedAt: new Date().toISOString()
+    // });
+  } catch (error) {
+    console.error('Error preparing ticket for NFC:', error);
+    return null;
+  }
 }
 
 /**

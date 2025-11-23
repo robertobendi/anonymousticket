@@ -39,8 +39,11 @@ public class WalletHceService extends HostApduService {
     public void onCreate() {
         super.onCreate();
         Log.d(TAG, "═══════════════════════════════════════");
-        Log.d(TAG, "WalletHceService created");
-        Log.d(TAG, "Phone is now emulating an NFC card");
+        Log.d(TAG, "✅ WalletHceService CREATED");
+        Log.d(TAG, "Service is now registered with Android system");
+        Log.d(TAG, "AID: F0010203040506");
+        Log.d(TAG, "Category: other (non-payment)");
+        Log.d(TAG, "Phone can now emulate an NFC card");
         Log.d(TAG, "Controller can read wallet data by scanning this phone");
         Log.d(TAG, "═══════════════════════════════════════");
     }
@@ -48,9 +51,10 @@ public class WalletHceService extends HostApduService {
     @Override
     public byte[] processCommandApdu(byte[] commandApdu, Bundle extras) {
         Log.d(TAG, "═══════════════════════════════════════");
-        Log.d(TAG, "Received APDU command");
+        Log.d(TAG, "🔔🔔🔔 HCE SERVICE: APDU COMMAND RECEIVED 🔔🔔🔔");
         Log.d(TAG, "Command length: " + commandApdu.length);
         Log.d(TAG, "Command: " + bytesToHex(commandApdu));
+        Log.d(TAG, "═══════════════════════════════════════");
         
         if (commandApdu == null || commandApdu.length < 4) {
             Log.w(TAG, "Invalid APDU command (too short)");
@@ -70,10 +74,10 @@ public class WalletHceService extends HostApduService {
                     byte[] ourAid = {(byte) 0xF0, (byte) 0x01, (byte) 0x02, (byte) 0x03, (byte) 0x04, (byte) 0x05, (byte) 0x06};
                     
                     if (Arrays.equals(receivedAid, ourAid)) {
-                        Log.d(TAG, "✓ SELECT command for our AID received - responding with success");
+                        Log.d(TAG, "✅✅✅ SELECT COMMAND FOR OUR AID - RESPONDING WITH SUCCESS ✅✅✅");
                         return new byte[]{(byte) 0x90, (byte) 0x00}; // Success
                     } else {
-                        Log.d(TAG, "SELECT for different AID, ignoring");
+                        Log.d(TAG, "⚠️ SELECT for different AID, ignoring");
                         return new byte[]{(byte) 0x6A, (byte) 0x82}; // File not found
                     }
                 }
@@ -86,11 +90,25 @@ public class WalletHceService extends HostApduService {
         
         // Check if this is a GET DATA command (CLA=0x00, INS=0xCA)
         if (commandApdu[0] == 0x00 && commandApdu[1] == (byte) 0xCA) {
-            Log.d(TAG, "✓ GET DATA command received");
+            Log.d(TAG, "═══════════════════════════════════════");
+            Log.d(TAG, "✅✅✅ GET DATA COMMAND RECEIVED ✅✅✅");
+            Log.d(TAG, "Command: " + bytesToHex(commandApdu));
+            Log.d(TAG, "═══════════════════════════════════════");
             
             if (walletData == null || walletData.isEmpty()) {
-                Log.w(TAG, "⚠️ No wallet data available");
-                return new byte[]{(byte) 0x6A, (byte) 0x82}; // File not found
+                Log.w(TAG, "⚠️⚠️⚠️ NO WALLET DATA AVAILABLE ⚠️⚠️⚠️");
+                // Return "pippo" as debug string instead of error
+                String debugData = "pippo";
+                byte[] debugBytes = debugData.getBytes(StandardCharsets.UTF_8);
+                byte[] debugResponse = new byte[debugBytes.length + 2];
+                System.arraycopy(debugBytes, 0, debugResponse, 0, debugBytes.length);
+                debugResponse[debugBytes.length] = (byte) 0x90;
+                debugResponse[debugBytes.length + 1] = (byte) 0x00;
+                Log.d(TAG, "═══════════════════════════════════════");
+                Log.d(TAG, "🔴🔴🔴 RETURNING DEBUG STRING: pippo 🔴🔴🔴");
+                Log.d(TAG, "Response hex: " + bytesToHex(debugResponse));
+                Log.d(TAG, "═══════════════════════════════════════");
+                return debugResponse;
             }
             
             // Return wallet data
@@ -103,12 +121,15 @@ public class WalletHceService extends HostApduService {
             response[dataBytes.length] = (byte) 0x90; // Success status byte 1
             response[dataBytes.length + 1] = (byte) 0x00; // Success status byte 2
             
-            Log.d(TAG, "✓✓✓✓✓✓✓✓✓✓✓✓✓✓✓✓✓✓✓✓✓✓✓✓✓✓✓✓✓✓✓✓✓✓✓✓✓✓✓✓✓✓✓✓");
-            Log.d(TAG, "✓✓✓ SENDING WALLET DATA VIA HCE! ✓✓✓");
+            Log.d(TAG, "═══════════════════════════════════════");
+            Log.d(TAG, "✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅");
+            Log.d(TAG, "✅✅✅ SENDING WALLET DATA VIA HCE! ✅✅✅");
             Log.d(TAG, "Data length: " + dataBytes.length + " bytes");
             Log.d(TAG, "Response length: " + response.length + " bytes");
+            Log.d(TAG, "Response hex: " + bytesToHex(response).substring(0, Math.min(100, bytesToHex(response).length())));
             Log.d(TAG, "Data preview: " + walletData.substring(0, Math.min(200, walletData.length())));
-            Log.d(TAG, "✓✓✓✓✓✓✓✓✓✓✓✓✓✓✓✓✓✓✓✓✓✓✓✓✓✓✓✓✓✓✓✓✓✓✓✓✓✓✓✓✓✓✓✓");
+            Log.d(TAG, "✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅");
+            Log.d(TAG, "═══════════════════════════════════════");
             
             return response;
         }
@@ -125,13 +146,18 @@ public class WalletHceService extends HostApduService {
     
     /**
      * Set wallet data to share via HCE
+     * This activates the HCE service - when a reader selects our AID,
+     * it will receive this data via GET DATA command
      */
     public static void setWalletData(String data) {
         walletData = data;
         Log.d(TAG, "═══════════════════════════════════════");
-        Log.d(TAG, "WALLET DATA SET FOR HCE");
+        Log.d(TAG, "✅ WALLET DATA SET FOR HCE");
         Log.d(TAG, "Data length: " + (data != null ? data.length() : 0) + " chars");
-        Log.d(TAG, "Phone is ready to share wallet via HCE");
+        Log.d(TAG, "HCE service is now ACTIVE and ready");
+        Log.d(TAG, "When reader selects AID F0010203040506:");
+        Log.d(TAG, "  - SELECT command will return 0x9000 (success)");
+        Log.d(TAG, "  - GET DATA command will return wallet data");
         Log.d(TAG, "Controller can scan this phone now");
         Log.d(TAG, "═══════════════════════════════════════");
     }

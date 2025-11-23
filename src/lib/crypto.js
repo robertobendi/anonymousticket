@@ -406,9 +406,9 @@ export async function submitMintTransaction({ ticketId, payload, signature }) {
       const xhr = new XMLHttpRequest();
       
       try {
-        xhr.open('POST', submitUrl, true);
-        xhr.setRequestHeader('Content-Type', 'application/json');
-        xhr.setRequestHeader('Accept', 'application/json');
+      xhr.open('POST', submitUrl, true);
+      xhr.setRequestHeader('Content-Type', 'application/json');
+      xhr.setRequestHeader('Accept', 'application/json');
       } catch (openError) {
         const errorMsg = `Failed to open request: ${openError?.message || String(openError)}`;
         console.error('❌ XHR open error:', errorMsg);
@@ -448,8 +448,8 @@ export async function submitMintTransaction({ ticketId, payload, signature }) {
           let errorMessage = `HTTP error! status: ${status}`;
           try {
             if (responseText) {
-              const errorJson = JSON.parse(responseText);
-              errorMessage += `, message: ${JSON.stringify(errorJson)}`;
+            const errorJson = JSON.parse(responseText);
+            errorMessage += `, message: ${JSON.stringify(errorJson)}`;
             } else {
               errorMessage += `, empty response body`;
             }
@@ -487,7 +487,7 @@ export async function submitMintTransaction({ ticketId, payload, signature }) {
       xhr.timeout = 30000; // 30 seconds
       
       try {
-        xhr.send(JSON.stringify(transaction));
+      xhr.send(JSON.stringify(transaction));
       } catch (sendError) {
         const errorMsg = `Failed to send request: ${sendError?.message || String(sendError)}`;
         console.error('❌ XHR send error:', errorMsg);

@@ -225,14 +225,6 @@ const ReceivedTickets = memo(() => {
                       <div className="text-xs font-mono break-all mb-2" style={{ color: THEME.text }}>
                         {ticket.id}
                       </div>
-                      {ticket.controlCode && (
-                        <>
-                          <div className="text-xs" style={{ color: THEME.textMuted }}>Control Code</div>
-                          <div className="text-sm font-mono font-bold" style={{ color: THEME.accent }}>
-                            {ticket.controlCode}
-                          </div>
-                        </>
-                      )}
                     </div>
                   </div>
                 </div>

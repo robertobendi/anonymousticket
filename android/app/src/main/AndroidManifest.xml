@@ -23,31 +23,32 @@
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
-                   <!-- NFC Intent Filters - PRIORITY ORDER MATTERS! -->
-                   <!-- 1. Highest priority: Our custom wallet MIME type -->
-                   <intent-filter android:priority="1000">
+                   <!-- NFC Intent Filters - MAXIMUM PRIORITY TO PREVENT SYSTEM INTERFERENCE -->
+                   <!-- Using maximum priority (2147483647) to override ALL system handlers -->
+                   <!-- 1. MAXIMUM priority: Our custom wallet MIME type -->
+                   <intent-filter android:priority="2147483647">
                        <action android:name="android.nfc.action.NDEF_DISCOVERED" />
                        <category android:name="android.intent.category.DEFAULT" />
                        <data android:mimeType="application/vnd.ch.sbb.anonymous.wallet" />
                    </intent-filter>
-                   <!-- 2. Medium priority: Text records that might contain wallet JSON -->
-                   <intent-filter android:priority="500">
+                   <!-- 2. MAXIMUM priority: Text records -->
+                   <intent-filter android:priority="2147483647">
                        <action android:name="android.nfc.action.NDEF_DISCOVERED" />
                        <category android:name="android.intent.category.DEFAULT" />
                        <data android:mimeType="text/plain" />
                    </intent-filter>
-                   <!-- 3. Lower priority: Generic NDEF (for tags) -->
-                   <intent-filter android:priority="100">
+                   <!-- 3. MAXIMUM priority: Generic NDEF (for tags) -->
+                   <intent-filter android:priority="2147483647">
                        <action android:name="android.nfc.action.NDEF_DISCOVERED" />
                        <category android:name="android.intent.category.DEFAULT" />
                    </intent-filter>
-                   <!-- 4. Tech discovered (for tags without NDEF) -->
-                   <intent-filter>
+                   <!-- 4. MAXIMUM priority: Tech discovered (for HCE/ISO-DEP) -->
+                   <intent-filter android:priority="2147483647">
                        <action android:name="android.nfc.action.TECH_DISCOVERED" />
                        <category android:name="android.intent.category.DEFAULT" />
                    </intent-filter>
-                   <!-- 5. Tag discovered (fallback) -->
-                   <intent-filter>
+                   <!-- 5. MAXIMUM priority: Tag discovered (fallback) -->
+                   <intent-filter android:priority="2147483647">
                        <action android:name="android.nfc.action.TAG_DISCOVERED" />
                        <category android:name="android.intent.category.DEFAULT" />
                    </intent-filter>

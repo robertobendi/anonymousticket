@@ -1,5 +1,6 @@
 import React, { Suspense, lazy, useEffect } from "react";
 import { Routes, Route, useLocation } from "react-router-dom";
+import { Toaster } from "react-hot-toast";
 import { THEME } from "@lib/themeColors";
 import Footer from "@layouts/Footer";
 
@@ -135,6 +136,39 @@ function App() {
         </ErrorBoundary>
       </main>
       <Footer />
+      <Toaster
+        position="top-center"
+        toastOptions={{
+          duration: 4000,
+          style: {
+            background: THEME.card,
+            color: THEME.text,
+            border: `2px solid ${THEME.border}`,
+            borderRadius: '8px',
+            padding: '12px 16px',
+            fontSize: '14px',
+            fontWeight: '500',
+          },
+          success: {
+            iconTheme: {
+              primary: THEME.success || '#10b981',
+              secondary: THEME.card,
+            },
+            style: {
+              borderColor: THEME.success || '#10b981',
+            },
+          },
+          error: {
+            iconTheme: {
+              primary: '#ef4444',
+              secondary: THEME.card,
+            },
+            style: {
+              borderColor: '#ef4444',
+            },
+          },
+        }}
+      />
     </div>
   );
 }

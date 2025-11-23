@@ -1,11 +1,15 @@
 /**
- * Simple NFC - Event-based approach
- * Native Android handles everything, JavaScript just listens for events
+ * Simple NFC - Clean event-based approach
+ * 
+ * ARCHITECTURE:
+ * - Sharing: Uses HCE (Host Card Emulation) - phone acts as NFC card
+ * - Receiving: Uses NFC Reader Mode - actively polls for cards
+ * 
+ * This is the simplest and most reliable approach for phone-to-phone NFC.
  */
 
 import { Capacitor } from '@capacitor/core';
 
-// Check if we're on Android
 const isAndroid = Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'android';
 
 /**
@@ -13,10 +17,7 @@ const isAndroid = Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'a
  */
 export async function checkNFC() {
   if (!isAndroid || !window.NFC) {
-    return {
-      available: false,
-      enabled: false
-    };
+    return { available: false, enabled: false };
   }
 
   try {
@@ -26,238 +27,190 @@ export async function checkNFC() {
       enabled: result.enabled === true
     };
   } catch (error) {
-    return {
-      available: false,
-      enabled: false
-    };
+    return { available: false, enabled: false };
+  }
+}
+
+// Global listener that stays active
+let globalNfcListener = null;
+let activeResolvers = [];
+let isListenerInitialized = false;
+
+// Direct callback function - called from Java
+// This is more reliable than CustomEvent
+if (typeof window !== 'undefined' && window.NFC) {
+  // Expose callback function for Java to call directly
+  window.NFC.onDataReceived = function(tagId, data) {
+    console.log('🔔🔔🔔 DIRECT CALLBACK TRIGGERED! 🔔🔔🔔');
+    console.log('🔔🔔🔔 DIRECT CALLBACK TRIGGERED! 🔔🔔🔔');
+    console.log('🔔🔔🔔 DIRECT CALLBACK TRIGGERED! 🔔🔔🔔');
+    console.log('Tag ID:', tagId);
+    console.log('Data:', data);
+    console.log('Data length:', data?.length || 0);
+    console.log('Active resolvers:', activeResolvers.length);
+    
+    // Resolve all active promises
+    if (data !== undefined && data !== null) {
+      const nfcData = { id: tagId, data: data };
+      
+      const resolvers = [...activeResolvers];
+      activeResolvers = [];
+      
+      console.log('✅✅✅ RESOLVING ' + resolvers.length + ' PROMISE(S) ✅✅✅');
+      console.log('Data preview:', data.substring(0, 200));
+      
+      resolvers.forEach(({ id, resolve }) => {
+        try {
+          console.log('Resolving promise #' + id);
+          resolve(nfcData);
+          console.log('✅ Promise #' + id + ' resolved');
+        } catch (e) {
+          console.error('❌ Error resolving promise #' + id + ':', e);
+        }
+      });
+    }
+  };
+  
+  console.log('✅✅✅ DIRECT CALLBACK REGISTERED ✅✅✅');
+  console.log('window.NFC.onDataReceived is now available');
+}
+
+/**
+ * Initialize global NFC listener once
+ * EXPORTED so it can be called explicitly
+ * MUST be called before startReading()
+ */
+export function initializeGlobalNfcListener() {
+  if (isListenerInitialized) {
+    console.log('⚠️ Global listener already initialized, skipping...');
+    return;
+  }
+  
+  console.log('🔧🔧🔧 INITIALIZING GLOBAL NFC LISTENER 🔧🔧🔧');
+  console.log('Window:', typeof window);
+  console.log('Window.addEventListener:', typeof window.addEventListener);
+  console.log('Current active resolvers:', activeResolvers.length);
+  
+  globalNfcListener = (event) => {
+    // FORCE multiple console.log to ensure visibility in debug panel
+    console.log('🔔🔔🔔🔔🔔🔔🔔🔔🔔🔔🔔🔔🔔🔔🔔🔔🔔🔔🔔🔔🔔🔔🔔🔔🔔🔔🔔🔔🔔🔔🔔🔔');
+    console.log('🔔🔔🔔 GLOBAL LISTENER TRIGGERED! 🔔🔔🔔');
+    console.log('🔔🔔🔔 GLOBAL LISTENER TRIGGERED! 🔔🔔🔔');
+    console.log('🔔🔔🔔 GLOBAL LISTENER TRIGGERED! 🔔🔔🔔');
+    console.log('Event:', JSON.stringify(event, null, 2));
+    console.log('Event type:', event.type);
+    console.log('Event detail:', JSON.stringify(event.detail, null, 2));
+    console.log('Event detail type:', typeof event.detail);
+    console.log('Active resolvers waiting:', activeResolvers.length);
+    
+    const tagId = event.detail?.id || '';
+    const tagData = event.detail?.data || '';
+
+    console.log('📱📱📱 NFC DATA IN LISTENER 📱📱📱');
+    console.log('Tag ID:', tagId.substring(0, 20));
+    console.log('Data Length:', tagData?.length || 0);
+    console.log('Data Preview:', tagData?.substring(0, 100));
+    console.log('Has Data:', tagData !== undefined && tagData !== null);
+    console.log('Data Type:', typeof tagData);
+    console.log('Is Empty:', tagData === '');
+
+    // ACCEPT ANY DATA - even empty string
+    if (tagData !== undefined && tagData !== null) {
+      const data = { id: tagId, data: tagData };
+      
+      // Resolve all active promises
+      const resolvers = [...activeResolvers];
+      activeResolvers = [];
+      
+      console.log('✅✅✅ RESOLVING PROMISES ✅✅✅');
+      console.log('Number of promises:', resolvers.length);
+      console.log('Data preview:', tagData.substring(0, 200));
+      console.log('Full data:', tagData);
+      
+      resolvers.forEach(({ id, resolve }) => {
+        try {
+          console.log('Resolving promise #' + id);
+          resolve(data);
+          console.log('✅ Promise #' + id + ' resolved');
+        } catch (e) {
+          console.error('❌ Error resolving promise #' + id + ':', e);
+        }
+      });
+      
+      console.log('🔔🔔🔔🔔🔔🔔🔔🔔🔔🔔🔔🔔🔔🔔🔔🔔🔔🔔🔔🔔🔔🔔🔔🔔🔔🔔🔔🔔🔔🔔🔔🔔');
+    } else {
+      console.log('⚠️ Event received but tagData is null/undefined');
+      console.log('Tag ID only:', tagId);
+    }
+  };
+  
+  try {
+    window.addEventListener('nfctag', globalNfcListener);
+    isListenerInitialized = true;
+    console.log('✅✅✅ GLOBAL LISTENER REGISTERED AND ACTIVE ✅✅✅');
+    console.log('Listener will stay active until page unload');
+    
+    // Also listen for any window events to verify the listener is working
+    window.addEventListener('test-nfc', (e) => {
+      console.log('🧪 Test event received:', e);
+    });
+    
+    // Test: dispatch a test event to verify listener works
+    setTimeout(() => {
+      console.log('🧪 Dispatching test event...');
+      window.dispatchEvent(new CustomEvent('test-nfc', { detail: { test: true } }));
+    }, 1000);
+    
+  } catch (error) {
+    console.error('❌ Error registering global listener:', error);
+    console.error('Error stack:', error.stack);
   }
 }
 
 /**
- * Start listening for NFC tags
- * Returns a promise that resolves when a tag is detected
- * For device-to-device: Keep scanning active until wallet data is received
+ * Start reading NFC tags/cards
+ * SIMPLE: Uses global listener that stays active
  */
 export async function startReading() {
   if (!isAndroid || !window.NFC) {
     throw new Error('NFC not available on this platform');
   }
 
-  // Enable scanning on native side - keep it active
+  // Ensure global listener is initialized
+  if (!isListenerInitialized) {
+    initializeGlobalNfcListener();
+  }
+
+  // Enable scanning
   try {
     window.NFC.enableScan();
-    console.log('✓ NFC scanning enabled - listening for wallet data...');
-    console.log('Hold device near NFC tag or phone with beacon active');
+    console.log('✅ NFC enableScan() called');
   } catch (error) {
-    console.error('Error enabling NFC scan:', error);
-    throw error;
+    console.error('Error enabling scan:', error);
+    // Continue anyway
   }
 
-  // Return promise that resolves when NFC event is received
+  // Return promise that resolves when data arrives via global listener
   return new Promise((resolve, reject) => {
-    let resolved = false;
-    let attempts = 0;
-    const maxAttempts = 10; // Allow more attempts for beacon mode
+    const resolverId = Date.now() + Math.random(); // Unique ID for this resolver
+    activeResolvers.push({ id: resolverId, resolve });
+    console.log(`📋 Added resolver #${resolverId}, total: ${activeResolvers.length}`);
 
-    const handler = (event) => {
-      const tagId = event.detail?.id || '';
-      const tagData = event.detail?.data || '';
-
-      attempts++;
-      console.log(`NFC read attempt ${attempts}:`, { 
-        id: tagId, 
-        dataLength: tagData?.length || 0,
-        preview: tagData?.substring(0, 100) + '...' 
-      });
-
-      // Emit detection event for ANY NFC detection (even if not expected format)
-      if (tagId || tagData) {
-        const detectionEvent = new CustomEvent('nfcdetection', {
-          detail: {
-            attempt: attempts,
-            tagId: tagId,
-            dataLength: tagData?.length || 0,
-            dataPreview: tagData?.substring(0, 100) || '',
-            hasData: !!(tagData && tagData.length > 0)
-          }
-        });
-        window.dispatchEvent(detectionEvent);
-      }
-
-      // Check if this is wallet data or signature message
-      const trimmedData = tagData?.trim() || '';
-      const isWalletJson = trimmedData.includes('"wallet"') || trimmedData.includes('"tickets"');
-      const isSignatureMessage = /^[0-9a-fA-F]{192}$/.test(trimmedData); // 192 hex chars = signature message
-      
-      if (tagData && (isWalletJson || isSignatureMessage)) {
-        if (resolved) return;
-        resolved = true;
-
-        window.removeEventListener('nfctag', handler);
-
-        // Disable scanning
-        try {
-          if (window.NFC) {
-            window.NFC.disableScan();
-          }
-        } catch (e) {
-          // Ignore
-        }
-
-        if (isSignatureMessage) {
-          console.log('✓✓✓ Signature message received via HCE! ✓✓✓');
-        } else {
-          console.log('✓✓✓ Wallet data received! ✓✓✓');
-        }
-        resolve({
-          id: tagId,
-          data: tagData
-        });
-      } else if (tagData && tagData.length > 0) {
-        // Got some data but not wallet - log it and keep listening
-        console.log(`Attempt ${attempts}: Got data but not wallet format, continuing...`);
-        console.log(`Detected data (${tagData.length} chars):`, tagData.substring(0, 200));
-        
-        if (attempts >= maxAttempts) {
-          // After max attempts, reject if no wallet data
-          if (!resolved) {
-            resolved = true;
-            window.removeEventListener('nfctag', handler);
-            try {
-              if (window.NFC) {
-                window.NFC.disableScan();
-              }
-            } catch (e) {
-              // Ignore
-            }
-            reject(new Error(`No wallet data received after ${maxAttempts} attempts. Detected ${tagData.length} chars of data but not in expected format. Make sure: 1) Sending phone clicked "Validate", 2) Both phones unlocked, 3) Hold phones back-to-back.`));
-          }
-        }
-      } else if (tagId) {
-        // Tag detected but no data - still show feedback
-        console.log(`Attempt ${attempts}: NFC tag detected (ID: ${tagId.substring(0, 16)}...) but no readable data`);
-      } else {
-        // No data yet, keep listening
-        console.log(`Attempt ${attempts}: No data yet, continuing to listen...`);
-      }
-    };
-
-    window.addEventListener('nfctag', handler);
-
-    // Timeout after 90 seconds (longer for beacon mode)
+    // Timeout after 2 seconds - short for fast retries
     setTimeout(() => {
-      if (resolved) return;
-      resolved = true;
-      window.removeEventListener('nfctag', handler);
-
-      // Disable scanning
-      try {
-        if (window.NFC) {
-          window.NFC.disableScan();
-        }
-      } catch (e) {
-        // Ignore
+      const index = activeResolvers.findIndex(r => r.id === resolverId);
+      if (index > -1) {
+        activeResolvers.splice(index, 1);
+        console.log(`⏱️ Timeout for resolver #${resolverId}, remaining: ${activeResolvers.length}`);
+        reject(new Error('Timeout - no data received'));
       }
-
-      reject(new Error('NFC read timeout. Make sure: 1) Sending phone clicked "Start Beacon", 2) Both phones unlocked, 3) Hold phones back-to-back, 4) Try "Write to Tag" mode with a physical NFC tag.'));
-    }, 90000);
+    }, 2000);
   });
 }
 
 /**
- * Request NFC permission (handled natively, this is just for compatibility)
- */
-export async function requestNFCPermission() {
-  // Permission is handled automatically by Android
-  return true;
-}
-
-/**
- * Write data to NFC tag or share via NFC
- * For device-to-device: One phone calls this, other phone scans
- * For tags: Write wallet data to a physical NFC tag
- */
-export async function writeNFC(data) {
-  if (!isAndroid || !window.NFC) {
-    throw new Error('NFC not available on this platform');
-  }
-
-  if (!data || data.length === 0) {
-    throw new Error('Data is required');
-  }
-
-  // Start write mode
-  try {
-    const result = JSON.parse(window.NFC.startWrite(data));
-    if (!result.success) {
-      throw new Error(result.error || 'Failed to start NFC write');
-    }
-    console.log('NFC write mode enabled:', result.message);
-  } catch (error) {
-    console.error('Error starting NFC write:', error);
-    throw new Error('Failed to start NFC write: ' + error.message);
-  }
-
-  // Return promise that resolves when write completes
-  return new Promise((resolve, reject) => {
-    let resolved = false;
-
-    const handler = (event) => {
-      if (resolved) return;
-      resolved = true;
-
-      window.removeEventListener('nfcwrite', handler);
-
-      const success = event.detail?.success === true;
-      const message = event.detail?.message || '';
-
-      console.log('NFC write result:', { success, message });
-
-      // Cancel write mode
-      try {
-        if (window.NFC) {
-          window.NFC.cancelWrite();
-        }
-      } catch (e) {
-        // Ignore
-      }
-
-      if (success) {
-        resolve({ success: true, message });
-      } else {
-        reject(new Error(message || 'NFC write failed'));
-      }
-    };
-
-    window.addEventListener('nfcwrite', handler);
-
-    // Timeout after 60 seconds
-    setTimeout(() => {
-      if (resolved) return;
-      resolved = true;
-      window.removeEventListener('nfcwrite', handler);
-
-      // Cancel write mode
-      try {
-        if (window.NFC) {
-          window.NFC.cancelWrite();
-        }
-      } catch (e) {
-        // Ignore
-      }
-
-      reject(new Error('NFC write timeout. Hold device near an NFC tag or another device and try again.'));
-    }, 60000);
-  });
-}
-
-/**
- * Start beacon mode - phone acts like an NFC tag
- * Controller can scan this phone to read wallet data
- * More reliable than device-to-device writing
- * 
- * NOTE: This doesn't wait for actual P2P exchange - it just enables the mode
- * The success message means "ready to share", not "shared successfully"
+ * Start beacon mode (HCE) - Phone acts as NFC card
+ * SIMPLE: Just set the data and activate HCE
  */
 export async function startBeacon(data) {
   if (!isAndroid || !window.NFC) {
@@ -268,18 +221,23 @@ export async function startBeacon(data) {
     throw new Error('Data is required');
   }
 
+  console.log('🚀 Starting beacon with data:', data.substring(0, 100));
+
   try {
-    const result = JSON.parse(window.NFC.startBeacon(data));
-    if (!result.success) {
-      throw new Error(result.error || 'Failed to start NFC beacon');
+    const result = window.NFC.startBeacon(data);
+    console.log('📤 startBeacon() result:', result);
+    
+    const parsed = JSON.parse(result);
+    
+    if (!parsed.success) {
+      throw new Error(parsed.error || 'Failed to start beacon');
     }
-    console.log('NFC beacon mode enabled:', result.message);
-    console.log('⚠️ Beacon is ACTIVE - waiting for controller to scan...');
-    console.log('⚠️ This does NOT mean data was sent - it means phone is ready to share');
-    return { success: true, message: result.message };
+    
+    console.log('✅✅✅ HCE BEACON ACTIVE - Data set:', data.substring(0, 100));
+    return { success: true, message: parsed.message };
   } catch (error) {
-    console.error('Error starting NFC beacon:', error);
-    throw new Error('Failed to start NFC beacon: ' + error.message);
+    console.error('❌ Error starting beacon:', error);
+    throw new Error('Failed to start beacon: ' + error.message);
   }
 }
 
@@ -290,9 +248,18 @@ export async function stopBeacon() {
   if (!isAndroid || !window.NFC) {
     return;
   }
+  
   try {
-    window.NFC.cancelWrite();
+    window.NFC.stopBeacon();
+    console.log('✅ Beacon stopped');
   } catch (e) {
-    // Ignore
+    console.warn('Error stopping beacon:', e);
   }
+}
+
+/**
+ * Request NFC permission (handled automatically by Android)
+ */
+export async function requestNFCPermission() {
+  return true;
 }

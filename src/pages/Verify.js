@@ -1,11 +1,12 @@
 import { useState, useEffect, memo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
+import toast from 'react-hot-toast';
 import { FiRadio, FiCheckCircle, FiXCircle, FiAlertCircle, FiRefreshCw, FiArrowLeft, FiChevronDown, FiChevronUp, FiMenu } from 'react-icons/fi';
 import { checkNFC, startReading, requestNFCPermission } from '@lib/nfc-simple';
 import { parseNFCTicketData } from '@lib/nfc';
 import { verifyTicket, parseQRCodeData } from '@lib/ticketGenerator';
-import { verifyTicketSignatureMessage } from '@lib/crypto';
+// Removed signature verification - just scan tickets directly
 import { THEME } from '@lib/themeColors';
 import AnimatedCard from '@components/ui/AnimatedCard';
 import AnimatedButton from '@components/ui/AnimatedButton';
@@ -27,8 +28,72 @@ const Verify = memo(() => {
   const [isVerifying, setIsVerifying] = useState(false);
   const [nfcDetection, setNfcDetection] = useState(null); // Show feedback when NFC detects something
   const [nfcSteps, setNfcSteps] = useState([]); // Step-by-step NFC process feedback
+  const [debugLogs, setDebugLogs] = useState([]); // Debug logs from console
+  const [showDebugPanel, setShowDebugPanel] = useState(true); // Show debug panel by default
+
+  // Intercept console.log to show in UI
+  useEffect(() => {
+    const originalLog = console.log;
+    const originalError = console.error;
+    const originalWarn = console.warn;
+    
+    console.log = (...args) => {
+      originalLog.apply(console, args);
+      const message = args.map(arg => 
+        typeof arg === 'object' ? JSON.stringify(arg, null, 2) : String(arg)
+      ).join(' ');
+      setDebugLogs(prev => [...prev.slice(-99), { // Keep last 100 logs
+        type: 'log',
+        message,
+        timestamp: new Date().toLocaleTimeString()
+      }]);
+    };
+    
+    console.error = (...args) => {
+      originalError.apply(console, args);
+      const message = args.map(arg => 
+        typeof arg === 'object' ? JSON.stringify(arg, null, 2) : String(arg)
+      ).join(' ');
+      setDebugLogs(prev => [...prev.slice(-99), {
+        type: 'error',
+        message,
+        timestamp: new Date().toLocaleTimeString()
+      }]);
+    };
+    
+    console.warn = (...args) => {
+      originalWarn.apply(console, args);
+      const message = args.map(arg => 
+        typeof arg === 'object' ? JSON.stringify(arg, null, 2) : String(arg)
+      ).join(' ');
+      setDebugLogs(prev => [...prev.slice(-99), {
+        type: 'warn',
+        message,
+        timestamp: new Date().toLocaleTimeString()
+      }]);
+    };
+    
+    return () => {
+      console.log = originalLog;
+      console.error = originalError;
+      console.warn = originalWarn;
+    };
+  }, []);
 
   useEffect(() => {
+    // Initialize global NFC listener IMMEDIATELY on component mount
+    const initListener = async () => {
+      try {
+        const { initializeGlobalNfcListener } = await import('@lib/nfc-simple');
+        console.log('🔧 Initializing global NFC listener on component mount...');
+        initializeGlobalNfcListener();
+        console.log('✅ Global NFC listener initialized');
+      } catch (error) {
+        console.error('❌ Error initializing global NFC listener:', error);
+      }
+    };
+    initListener();
+    
     // Check NFC availability - don't request permission on load to avoid blocking
     const checkNFCStatus = async () => {
       try {
@@ -85,16 +150,37 @@ const Verify = memo(() => {
     const stepHandler = (event) => {
       const step = event.detail;
       console.log('📋 NFC Step Event Received:', step);
-      setNfcSteps(prev => {
-        const newSteps = [...prev, {
-          step: step.step,
-          message: step.message,
-          details: step.details,
-          timestamp: step.timestamp || new Date().toISOString()
-        }];
-        console.log('📋 Total steps:', newSteps.length);
-        return newSteps;
-      });
+      
+      // Don't add duplicate "scanning_active" events - only show it once
+      if (step.step === 'scanning_active') {
+        setNfcSteps(prev => {
+          // Check if we already have a scanning_active step
+          const hasScanningActive = prev.some(s => s.step === 'scanning_active');
+          if (hasScanningActive) {
+            console.log('⚠️ Duplicate scanning_active event, ignoring');
+            return prev; // Don't add duplicate
+          }
+          // Add it if it's the first one
+          return [...prev, {
+            step: step.step,
+            message: step.message,
+            details: step.details,
+            timestamp: step.timestamp || new Date().toISOString()
+          }];
+        });
+      } else {
+        // For all other events, add them normally
+        setNfcSteps(prev => {
+          const newSteps = [...prev, {
+            step: step.step,
+            message: step.message,
+            details: step.details,
+            timestamp: step.timestamp || new Date().toISOString()
+          }];
+          console.log('📋 Total steps:', newSteps.length);
+          return newSteps;
+        });
+      }
     };
     
     window.addEventListener('nfcdetection', detectionHandler);
@@ -112,40 +198,88 @@ const Verify = memo(() => {
       // Check if NFC is available
       const status = await checkNFC();
       if (!status.available) {
-        setError('NFC is not available on this device.');
+        const errorMsg = 'NFC is not available on this device.';
+        setError(errorMsg);
         setIsReading(false);
+        toast.error(errorMsg, {
+          duration: 4000,
+        });
         return;
       }
 
       if (!status.enabled) {
-        setError('NFC is disabled. Please enable NFC in your device settings.');
+        const errorMsg = 'NFC is disabled. Please enable NFC in your device settings.';
+        setError(errorMsg);
         setIsReading(false);
+        toast.error(errorMsg, {
+          duration: 4000,
+        });
         return;
       }
+      
+      toast.loading('Scanning for NFC tag...', {
+        id: 'nfc-scan',
+        duration: 90000, // Long duration for scanning
+      });
 
       // Start reading NFC - keep trying until we get wallet data
       console.log('Starting NFC read - waiting for wallet data...');
       console.log('Hold phone near NFC tag or another phone with beacon active');
       
-      // For continuous mode, keep reading until we get data
-      let nfcData;
-      if (isContinuousMode) {
-        // Keep reading in a loop
-        while (true) {
-          try {
-            nfcData = await startReading();
-            console.log('NFC read completed:', nfcData);
-            break; // Got data, exit loop
-          } catch (error) {
-            console.log('Read attempt failed, continuing...', error.message);
-            // Continue trying
-            await new Promise(resolve => setTimeout(resolve, 1000));
-          }
-        }
-      } else {
-        nfcData = await startReading();
-        console.log('NFC read completed:', nfcData);
+      // Initialize global listener BEFORE starting loop
+      console.log('🔧 Initializing global NFC listener...');
+      const { initializeGlobalNfcListener } = await import('@lib/nfc-simple');
+      // Force initialization by calling it
+      if (typeof initializeGlobalNfcListener === 'function') {
+        initializeGlobalNfcListener();
       }
+      
+      // Also manually add a test listener to verify events are received
+      const testHandler = (event) => {
+        console.log('🧪🧪🧪 TEST LISTENER TRIGGERED! 🧪🧪🧪');
+        console.log('Event:', event);
+        console.log('Event type:', event.type);
+        console.log('Event detail:', event.detail);
+      };
+      window.addEventListener('nfctag', testHandler);
+      console.log('✅ Test listener added');
+      
+      // SIMPLE LOOP: Keep trying until we get data
+      let nfcData = null;
+      let attempts = 0;
+      
+      console.log('🔄 Starting NFC read loop - will keep trying until data received...');
+      console.log('Global listener should be active. Waiting for nfctag events...');
+      
+      while (!nfcData) {
+        try {
+          attempts++;
+          if (attempts % 10 === 0) {
+            console.log(`🔄 Attempt ${attempts}... (still waiting for nfctag event)`);
+          }
+          
+          nfcData = await startReading();
+          
+          if (nfcData && nfcData.data) {
+            console.log('✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅');
+            console.log('✅✅✅ DATA RECEIVED:', nfcData.data.substring(0, 100));
+            console.log('✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅');
+            break;
+          }
+        } catch (error) {
+          // Timeout is normal - just retry
+          if (attempts % 10 === 0) {
+            console.log(`⏱️ Attempt ${attempts} timeout, retrying...`);
+          }
+          nfcData = null;
+        }
+        
+        // Small delay before next attempt
+        await new Promise(resolve => setTimeout(resolve, 200));
+      }
+      
+      // Cleanup test listener
+      window.removeEventListener('nfctag', testHandler);
       
       // Extract ticket data - simple format returns {id, data}
       const tagId = nfcData.id || '';
@@ -159,36 +293,75 @@ const Verify = memo(() => {
       // Check if this is a wallet (contains tickets array) - from beacon mode
       if (parsedData && parsedData.wallet && Array.isArray(parsedData.tickets)) {
         console.log('Wallet detected with', parsedData.tickets.length, 'tickets');
+        toast.dismiss('nfc-scan');
+        toast.success(`Received wallet with ${parsedData.tickets.length} ticket(s)!`, {
+          icon: '📱',
+          duration: 3000,
+        });
         // Navigate to ReceivedTickets page with wallet data
         navigate('/received', { state: { walletData: parsedData } });
         setIsReading(false);
         return;
       }
       
-      // Check if this is a signature message (for ticket validation)
-      if (parsedData && parsedData.type === 'signature_message' && parsedData.messageHex) {
-        console.log('Signature message detected, verifying...');
-        const isValid = verifyTicketSignatureMessage(parsedData.messageHex);
-        
-        // Extract public key from message for display
-        const publicKeyHex = parsedData.messageHex.substring(0, 64); // First 64 hex chars = 32 bytes
-        
-        await setVerificationResultWithCooldown({
-          valid: isValid,
-          message: isValid 
-            ? 'Ticket signature verified successfully. Challenge "autism" validated.' 
-            : 'Ticket signature verification failed. Invalid signature or corrupted data.',
-          ticketId: publicKeyHex,
-          controlCode: null,
-          origin: null,
-          destination: null,
-          date: null,
-          rawTagId: tagId,
-          rawData: ticketDataString,
-          isSignatureVerification: true,
-        });
-        return;
-      }
+               // Check if this is a test message
+               if (parsedData && parsedData.test) {
+                 console.log('✅✅✅ TEST MESSAGE RECEIVED:', parsedData.test);
+                 toast.dismiss('nfc-scan');
+                 toast.success(`🎉 ${parsedData.test}! NFC Communication Works!`, {
+                   icon: '🎉',
+                   duration: 5000,
+                 });
+                 
+                 await setVerificationResultWithCooldown({
+                   valid: true,
+                   message: `✅ TEST SUCCESSFUL: ${parsedData.test}`,
+                   ticketId: 'TEST',
+                   origin: null,
+                   destination: null,
+                   date: null,
+                   rawTagId: tagId,
+                   rawData: ticketDataString,
+                   isTicket: false,
+                 });
+                 return;
+               }
+               
+               // Check if this is a ticket JSON (simple format)
+               if (parsedData && parsedData.ticket === true) {
+                 console.log('Ticket JSON detected:', parsedData);
+                 toast.dismiss('nfc-scan');
+                 
+                 // Just verify it's a valid ticket structure
+                 const isValid = parsedData.id && (parsedData.price || parsedData.ticketId);
+                 
+                 if (isValid) {
+                   toast.success('Ticket received!', {
+                     icon: '✅',
+                     duration: 3000,
+                   });
+                 } else {
+                   toast.error('Invalid ticket format', {
+                     icon: '❌',
+                     duration: 4000,
+                   });
+                 }
+                 
+                 await setVerificationResultWithCooldown({
+                   valid: isValid,
+                   message: isValid 
+                     ? 'Ticket received successfully. Ticket ID: ' + (parsedData.id || parsedData.ticketId)
+                     : 'Invalid ticket format. Missing required fields.',
+                   ticketId: parsedData.id || parsedData.ticketId,
+                   origin: parsedData.origin || null,
+                   destination: parsedData.destination || null,
+                   date: parsedData.date || parsedData.timestamp || null,
+                   rawTagId: tagId,
+                   rawData: ticketDataString,
+                   isTicket: true,
+                 });
+                 return;
+               }
       
       // Check if parsed data is valid
       if (!parsedData || (!parsedData.ticketId && !parsedData.id)) {
@@ -197,7 +370,6 @@ const Verify = memo(() => {
           valid: false,
           message: 'Invalid ticket format - no ticket ID found. Raw NFC data available below.',
           ticketId: null,
-          controlCode: null,
           origin: null,
           destination: null,
           date: null,
@@ -218,11 +390,23 @@ const Verify = memo(() => {
       });
       console.log('Verification result:', verification);
       
+      toast.dismiss('nfc-scan');
+      if (verification.valid) {
+        toast.success('Ticket is valid!', {
+          icon: '✅',
+          duration: 3000,
+        });
+      } else {
+        toast.error(verification.message || 'Ticket is invalid', {
+          icon: '❌',
+          duration: 4000,
+        });
+      }
+      
       await setVerificationResultWithCooldown({
         valid: verification.valid,
         message: verification.message,
         ticketId: ticketId,
-        controlCode: parsedData.controlCode,
         origin: parsedData.origin,
         destination: parsedData.destination,
         date: parsedData.date,
@@ -238,13 +422,22 @@ const Verify = memo(() => {
 
     } catch (error) {
       console.error('NFC read error:', error);
+      toast.dismiss('nfc-scan');
       // Show detailed error message on screen
       const errorMsg = error.message || 'Failed to read NFC tag';
       setError(errorMsg);
       
       // If it's a plugin not found error, show more details
       if (errorMsg.includes('plugin not found')) {
-        setError(`NFC Plugin Error:\n\n${errorMsg}\n\nThis means the Android plugin is not registered. The app needs to be rebuilt with NFC support.`);
+        const fullError = `NFC Plugin Error:\n\n${errorMsg}\n\nThis means the Android plugin is not registered. The app needs to be rebuilt with NFC support.`;
+        setError(fullError);
+        toast.error('NFC plugin not found. App needs to be rebuilt.', {
+          duration: 6000,
+        });
+      } else {
+        toast.error(errorMsg, {
+          duration: 5000,
+        });
       }
     } finally {
       setIsReading(false);
@@ -266,7 +459,6 @@ const Verify = memo(() => {
       valid: verification.valid,
       message: verification.message,
       ticketId: parsed.ticketId || input,
-      controlCode: parsed.controlCode,
     });
   };
 
@@ -464,9 +656,8 @@ const Verify = memo(() => {
           )}
         </AnimatePresence>
 
-        {/* Step-by-Step NFC Process Feedback */}
-        <AnimatePresence>
-          {nfcSteps.length > 0 && (
+        {/* Step-by-Step NFC Process Feedback - ALWAYS VISIBLE WHEN READING */}
+        {(isReading || nfcSteps.length > 0) && (
             <motion.div
               initial={{ opacity: 0, y: -10 }}
               animate={{ opacity: 1, y: 0 }}
@@ -481,13 +672,43 @@ const Verify = memo(() => {
               <div className="flex items-start gap-2 mb-2">
                 <FiRefreshCw style={{ color: THEME.accent, marginTop: '2px', flexShrink: 0 }} size={18} />
                 <p className="text-xs font-bold" style={{ color: THEME.text }}>
-                  📋 NFC Process Steps ({nfcSteps.length})
+                  📋 NFC Process Steps {isReading ? '(Scanning...)' : `(${nfcSteps.length})`}
                 </p>
               </div>
               <div className="space-y-1 max-h-64 overflow-y-auto">
-                {nfcSteps.map((step, index) => {
+                {nfcSteps.length === 0 && isReading ? (
+                  <div className="text-xs p-2" style={{ color: THEME.textMuted }}>
+                    Waiting for NFC tag... Hold phones back-to-back
+                  </div>
+                ) : (
+                  nfcSteps.map((step, index) => {
                   const stepIcons = {
                     'tag_detected': '🏷️',
+                    'scanning_enabled': '🔄',
+                    'scanning_active': '🔄', // Changed from 🔥 to 🔄 to be less prominent
+                    'scanning_error': '❌',
+                    'reader_mode_started': '🔄',
+                    'reader_mode_error': '❌',
+                    'foreground_dispatch_enabled': '🔥',
+                    'foreground_dispatch_error': '❌',
+                    'iso_dep_found': '✅',
+                    'iso_dep_connecting': '🔌',
+                    'iso_dep_connected': '✅',
+                    'select_sending': '📤',
+                    'select_response': '📥',
+                    'select_success': '✅',
+                    'select_failed': '❌',
+                    'getdata_sending': '📤',
+                    'getdata_response': '📥',
+                    'data_received': '✅',
+                    'read_error': '❌',
+                    'hce_activated': '✅',
+                    'hce_failed': '❌',
+                    'p2p_activated': '📱',
+                    'p2p_sending': '📤',
+                    'p2p_received': '📥',
+                    'p2p_data_received': '✅',
+                    'p2p_error': '❌',
                     'hce_start': '🔄',
                     'hce_iso_dep_found': '✅',
                     'hce_connecting': '🔌',
@@ -532,11 +753,11 @@ const Verify = memo(() => {
                       </div>
                     </motion.div>
                   );
-                })}
+                  })
+                )}
               </div>
             </motion.div>
-          )}
-        </AnimatePresence>
+        )}
 
         {/* Verification Cooldown Loading */}
         <AnimatePresence>
@@ -599,9 +820,7 @@ const Verify = memo(() => {
               )}
               <div className="flex-1 min-w-0">
                 <h2 className="text-lg sm:text-xl font-bold mb-1" style={{ color: THEME.text, lineHeight: '1.2' }}>
-                  {verificationResult.isSignatureVerification 
-                    ? (verificationResult.valid ? 'Signature Verified ✓' : 'Signature Invalid ✗')
-                    : (verificationResult.valid ? 'Ticket Valid' : 'Ticket Invalid')}
+                  {verificationResult.valid ? 'Ticket Valid' : 'Ticket Invalid'}
                 </h2>
                 <p className="text-xs sm:text-sm leading-relaxed" style={{ color: THEME.textMuted }}>
                   {verificationResult.message}
@@ -677,14 +896,6 @@ const Verify = memo(() => {
                     {verificationResult.ticketId}
                   </span>
                 </div>
-                {verificationResult.controlCode && (
-                  <div className="flex justify-between items-start gap-2">
-                    <span className="flex-shrink-0" style={{ color: THEME.textMuted }}>Control Code:</span>
-                    <span className="font-mono font-bold text-right break-all" style={{ color: THEME.accent }}>
-                      {verificationResult.controlCode}
-                    </span>
-                  </div>
-                )}
                 {verificationResult.origin && verificationResult.destination && (
                   <div className="flex justify-between items-start gap-2">
                     <span className="flex-shrink-0" style={{ color: THEME.textMuted }}>Route:</span>
@@ -720,6 +931,115 @@ const Verify = memo(() => {
             </motion.div>
           )}
         </AnimatePresence>
+
+        {/* Debug Logs Panel */}
+        <AnimatePresence>
+          {showDebugPanel && (
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 20 }}
+              className="mb-4 sm:mb-6 rounded-lg border-2"
+              style={{ 
+                backgroundColor: THEME.card, 
+                borderColor: THEME.border,
+                maxHeight: '400px',
+                display: 'flex',
+                flexDirection: 'column'
+              }}
+            >
+              <div 
+                className="p-2 sm:p-3 flex items-center justify-between border-b-2"
+                style={{ borderColor: THEME.border }}
+              >
+                <h3 className="text-sm sm:text-base font-bold" style={{ color: THEME.text }}>
+                  📋 Debug Logs ({debugLogs.length})
+                </h3>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setDebugLogs([])}
+                    className="px-2 py-1 text-xs rounded"
+                    style={{ 
+                      backgroundColor: THEME.accent + '20',
+                      color: THEME.accent,
+                      border: `1px solid ${THEME.accent}`
+                    }}
+                  >
+                    Clear
+                  </button>
+                  <button
+                    onClick={() => setShowDebugPanel(false)}
+                    className="px-2 py-1 text-xs rounded"
+                    style={{ 
+                      backgroundColor: THEME.border + '20',
+                      color: THEME.text,
+                      border: `1px solid ${THEME.border}`
+                    }}
+                  >
+                    Hide
+                  </button>
+                </div>
+              </div>
+              <div 
+                className="overflow-y-auto p-2 sm:p-3 space-y-1"
+                style={{ maxHeight: '350px' }}
+              >
+                {debugLogs.length === 0 ? (
+                  <p className="text-xs text-center p-4" style={{ color: THEME.textMuted }}>
+                    No logs yet. Start scanning to see debug output.
+                  </p>
+                ) : (
+                  debugLogs.map((log, index) => (
+                    <div
+                      key={index}
+                      className="text-xs p-2 rounded border-l-2"
+                      style={{
+                        backgroundColor: log.type === 'error' 
+                          ? '#ff000010' 
+                          : log.type === 'warn'
+                          ? '#ffaa0010'
+                          : THEME.card,
+                        borderLeftColor: log.type === 'error'
+                          ? '#ff0000'
+                          : log.type === 'warn'
+                          ? '#ffaa00'
+                          : THEME.accent,
+                        color: log.type === 'error'
+                          ? '#ff0000'
+                          : log.type === 'warn'
+                          ? '#ffaa00'
+                          : THEME.text
+                      }}
+                    >
+                      <div className="flex items-start gap-2">
+                        <span className="text-xs opacity-60 flex-shrink-0" style={{ color: THEME.textMuted }}>
+                          {log.timestamp}
+                        </span>
+                        <span className="flex-1 break-words font-mono">
+                          {log.message}
+                        </span>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {!showDebugPanel && (
+          <button
+            onClick={() => setShowDebugPanel(true)}
+            className="w-full py-2 text-xs rounded-lg mb-4"
+            style={{ 
+              backgroundColor: THEME.border + '20',
+              color: THEME.text,
+              border: `1px solid ${THEME.border}`
+            }}
+          >
+            Show Debug Logs
+          </button>
+        )}
       </div>
 
       {/* Mobile Sidebar */}
