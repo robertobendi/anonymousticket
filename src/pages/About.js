@@ -8,15 +8,33 @@ import Navbar from '@layouts/Navbar';
 const ABOUT_CONTENT = [
   {
     id: 1,
-    title: "How it Works - Core Concept",
+    title: "How it Works - Core Concepts",
     text: "NodePass validates tickets via NFC in three steps: identification with a smartphone, validation, and confirmation. The process, prioritizing customer anonymity, automates reading, checking, and payment—enhancing passenger check-in speed and safety.",
     image: "/src/assets/img/overview.png"
   },
   {
     id: 2,
-    title: "Core Concept - Step 1",
-    text: "Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.",
-    image: "https://placehold.co/600x400/2b2b2b/FFF?text=Step+2"
+    title: "Core Concept - Where are we going??",
+    text: "Select your starting point, destination, and number of passengers.",
+    image: "/src/assets/img/book.png"
+  },  
+  {
+    id: 3,
+    title: "Core Concept - And now?!",
+    text: "Before boarding the train, tap 'Activate' in the wallet section where you will find all your tickets.",
+    image: "/src/assets/img/activate.png"
+  },
+  {
+    id: 4,
+    title: "Core Concept - 'Paper', please.",
+    text: "When the conductor arrives, they verify your ticket by bringing their device close to your phone and checking it via NFC.",
+    image: "/src/assets/img/verification.png"
+  },
+  {
+    id: 5,
+    title: "Observability also on anonymous tickets",
+    text: "Station staff can verify the ticket's authenticity and ensure it hasn't been used multiple times.",
+    image: "/src/assets/img/dashboard.png"
   }
 ];
 
