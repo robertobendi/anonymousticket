@@ -23,35 +23,6 @@
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
-                   <!-- NFC Intent Filters - MAXIMUM PRIORITY TO PREVENT SYSTEM INTERFERENCE -->
-                   <!-- Using maximum priority (2147483647) to override ALL system handlers -->
-                   <!-- 1. MAXIMUM priority: Our custom wallet MIME type -->
-                   <intent-filter android:priority="2147483647">
-                       <action android:name="android.nfc.action.NDEF_DISCOVERED" />
-                       <category android:name="android.intent.category.DEFAULT" />
-                       <data android:mimeType="application/vnd.ch.sbb.anonymous.wallet" />
-                   </intent-filter>
-                   <!-- 2. MAXIMUM priority: Text records -->
-                   <intent-filter android:priority="2147483647">
-                       <action android:name="android.nfc.action.NDEF_DISCOVERED" />
-                       <category android:name="android.intent.category.DEFAULT" />
-                       <data android:mimeType="text/plain" />
-                   </intent-filter>
-                   <!-- 3. MAXIMUM priority: Generic NDEF (for tags) -->
-                   <intent-filter android:priority="2147483647">
-                       <action android:name="android.nfc.action.NDEF_DISCOVERED" />
-                       <category android:name="android.intent.category.DEFAULT" />
-                   </intent-filter>
-                   <!-- 4. MAXIMUM priority: Tech discovered (for HCE/ISO-DEP) -->
-                   <intent-filter android:priority="2147483647">
-                       <action android:name="android.nfc.action.TECH_DISCOVERED" />
-                       <category android:name="android.intent.category.DEFAULT" />
-                   </intent-filter>
-                   <!-- 5. MAXIMUM priority: Tag discovered (fallback) -->
-                   <intent-filter android:priority="2147483647">
-                       <action android:name="android.nfc.action.TAG_DISCOVERED" />
-                       <category android:name="android.intent.category.DEFAULT" />
-                   </intent-filter>
 
         </activity>
 
@@ -64,25 +35,9 @@
                 android:name="android.support.FILE_PROVIDER_PATHS"
                 android:resource="@xml/file_paths"></meta-data>
         </provider>
-
-        <!-- Host Card Emulation Service - Makes phone act like NFC card -->
-        <service
-            android:name=".WalletHceService"
-            android:exported="true"
-            android:permission="android.permission.BIND_NFC_SERVICE">
-            <intent-filter>
-                <action android:name="android.nfc.cardemulation.action.HOST_APDU_SERVICE" />
-            </intent-filter>
-            <meta-data
-                android:name="android.nfc.cardemulation.host_apdu_service"
-                android:resource="@xml/apduservice" />
-        </service>
     </application>
 
     <!-- Permissions -->
     <uses-permission android:name="android.permission.INTERNET" />
-    <!-- NFC permission - this is a "normal" permission, auto-granted at install -->
-    <uses-permission android:name="android.permission.NFC" />
-    <!-- NFC feature - not required, app works without NFC -->
-    <uses-feature android:name="android.hardware.nfc" android:required="false" />
+    <uses-permission android:name="android.permission.CAMERA" />
 </manifest>
