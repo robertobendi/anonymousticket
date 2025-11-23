@@ -1,8 +1,8 @@
-import { useState, useEffect, useCallback, memo } from 'react';
+import { useState, useEffect, useCallback, memo, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Capacitor } from '@capacitor/core';
-import { FiBarChart2, FiTrendingUp, FiCheckCircle, FiRefreshCw, FiArrowLeft, FiCalendar, FiMapPin, FiX, FiMenu, FiLink, FiHash, FiClock, FiShield, FiDollarSign, FiLogOut, FiAlertCircle } from 'react-icons/fi';
+import { FiBarChart2, FiTrendingUp, FiCheckCircle, FiRefreshCw, FiArrowLeft, FiCalendar, FiMapPin, FiX, FiMenu, FiLink, FiHash, FiClock, FiShield, FiDollarSign, FiLogOut, FiAlertCircle, FiSmartphone, FiMonitor } from 'react-icons/fi';
 import { THEME } from '@lib/themeColors';
 import SwitzerlandMap from '@components/SwitzerlandMap';
 import AnimatedCard from '@components/ui/AnimatedCard';
@@ -79,6 +79,26 @@ const Dashboard = memo(() => {
   const [chainData, setChainData] = useState(null);
   const [showChainExplorer, setShowChainExplorer] = useState(false);
   const [error, setError] = useState(null);
+
+  const deviceStats = useMemo(() => {
+    if (!chainData || !chainData.blocks) return { phone: 0, totem: 0, total: 0 };
+    let phone = 0;
+    let totem = 0;
+    chainData.blocks.forEach(block => {
+      block.transactions?.forEach(tx => {
+        // Only count MINT transactions
+        if (tx.type === 'MINT') {
+          const device = tx.payload?.deviceId || '';
+          if (device.toUpperCase().includes('PHONE')) {
+            phone++;
+          } else {
+            totem++; // Includes KIOSK, SCANNER, etc.
+          }
+        }
+      });
+    });
+    return { phone, totem, total: phone + totem };
+  }, [chainData]);
 
   const processChainData = useCallback((data) => {
     if (!data || !data.blocks) return;
@@ -755,7 +775,86 @@ const Dashboard = memo(() => {
         </AnimatePresence>
 
         {/* Chain Explorer */}
-        <AnimatedCard className="p-4 sm:p-6 rounded-lg mb-4 sm:mb-6" style={{ backgroundColor: THEME.card, border: `2px solid ${THEME.border}`, borderRadius: '8px' }}>
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6 mb-4 sm:mb-6">
+          {/* Device Stats Chart */}
+          <AnimatedCard className="p-4 sm:p-6 rounded-lg border-2" style={{ backgroundColor: THEME.card, borderColor: THEME.border }}>
+            <h3 className="text-lg font-bold mb-4 flex items-center gap-2" style={{ color: THEME.text }}>
+              <FiBarChart2 size={20} style={{ color: THEME.accent }} />
+              Device Sales Distribution
+            </h3>
+            
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-8">
+              {/* Donut Chart */}
+              <div className="relative w-48 h-48 flex items-center justify-center">
+                <svg width="100%" height="100%" viewBox="0 0 100 100" className="transform -rotate-90">
+                  {/* Background Circle (Totem) */}
+                  <circle
+                    cx="50"
+                    cy="50"
+                    r="40"
+                    fill="transparent"
+                    stroke={THEME.textMuted}
+                    strokeWidth="12"
+                    strokeOpacity="0.2"
+                  />
+                  {/* Phone Segment */}
+                  <motion.circle
+                    cx="50"
+                    cy="50"
+                    r="40"
+                    fill="transparent"
+                    stroke={THEME.accent}
+                    strokeWidth="12"
+                    strokeDasharray={`${deviceStats.total > 0 ? (deviceStats.phone / deviceStats.total) * 251.2 : 0} 251.2`}
+                    initial={{ strokeDasharray: "0 251.2" }}
+                    animate={{ strokeDasharray: `${deviceStats.total > 0 ? (deviceStats.phone / deviceStats.total) * 251.2 : 0} 251.2` }}
+                    transition={{ duration: 1, ease: "easeOut" }}
+                    strokeLinecap="round"
+                  />
+                </svg>
+                <div className="absolute inset-0 flex flex-col items-center justify-center">
+                  <span className="text-2xl font-bold" style={{ color: THEME.text }}>
+                    {deviceStats.total}
+                  </span>
+                  <span className="text-xs uppercase font-bold" style={{ color: THEME.textMuted }}>
+                    Total
+                  </span>
+                </div>
+              </div>
+
+              {/* Legend */}
+              <div className="flex flex-col gap-4 w-full sm:w-auto">
+                <div className="flex items-center justify-between sm:justify-start gap-3">
+                  <div className="flex items-center gap-2">
+                    <div className="w-3 h-3 rounded-full" style={{ backgroundColor: THEME.accent }}></div>
+                    <div className="flex items-center gap-2">
+                      <FiSmartphone size={16} style={{ color: THEME.text }} />
+                      <span className="text-sm font-bold" style={{ color: THEME.text }}>Phone</span>
+                    </div>
+                  </div>
+                  <div className="text-sm font-bold" style={{ color: THEME.text }}>
+                    {deviceStats.total > 0 ? Math.round((deviceStats.phone / deviceStats.total) * 100) : 0}%
+                  </div>
+                </div>
+                
+                <div className="flex items-center justify-between sm:justify-start gap-3">
+                  <div className="flex items-center gap-2">
+                    <div className="w-3 h-3 rounded-full" style={{ backgroundColor: `${THEME.textMuted}40` }}></div>
+                    <div className="flex items-center gap-2">
+                      <FiMonitor size={16} style={{ color: THEME.textMuted }} />
+                      <span className="text-sm font-bold" style={{ color: THEME.textMuted }}>Totem</span>
+                    </div>
+                  </div>
+                  <div className="text-sm font-bold" style={{ color: THEME.textMuted }}>
+                    {deviceStats.total > 0 ? Math.round((deviceStats.totem / deviceStats.total) * 100) : 0}%
+                  </div>
+                </div>
+              </div>
+            </div>
+          </AnimatedCard>
+
+          {/* Chain Explorer - Spans 2 columns on lg */}
+          <AnimatedCard className="lg:col-span-2 p-4 sm:p-6 rounded-lg" style={{ backgroundColor: THEME.card, border: `2px solid ${THEME.border}`, borderRadius: '8px' }}>
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 flex items-center justify-center" style={{ backgroundColor: `${THEME.accent}20` }}>
@@ -808,7 +907,6 @@ const Dashboard = memo(() => {
           </div>
 
 
-          <AnimatePresence>
             {showChainExplorer && (
               <motion.div
                 initial={{ opacity: 0, height: 0 }}
@@ -1080,9 +1178,9 @@ const Dashboard = memo(() => {
                 )}
               </motion.div>
             )}
-          </AnimatePresence>
-        </AnimatedCard>
-
+            {/* Removed AnimatePresence wrapper here because it was causing layout shifts or was redundant with the new structure */}
+          </AnimatedCard>
+        </div>
       </section>
 
       {/* Mobile Sidebar */}
